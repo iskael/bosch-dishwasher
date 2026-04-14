@@ -52,7 +52,12 @@
 
   const SCENARIOS = {
     running:  { 'sensor.lavavajillas_operation_state': { state: 'Run' },    'sensor.lavavajillas_program_progress': { state: '65' } },
-    idle:     { 'sensor.lavavajillas_operation_state': { state: 'Ready' },  'sensor.lavavajillas_program_progress': { state: '0'  }, 'sensor.lavavajillas_program_finish_time': { state: '0' } },
+    idle: {
+      'sensor.lavavajillas_operation_state':       { state: 'Ready' },
+      'sensor.lavavajillas_program_progress':      { state: '0' },
+      'sensor.lavavajillas_program_finish_time':   { state: '0' },
+      'select.lavavajillas_active_program':        { state: 'unavailable' },
+    },
     finished: { 'sensor.lavavajillas_operation_state': { state: 'Finished' }, 'sensor.lavavajillas_program_progress': { state: '100' } },
     aborted:  { 'sensor.lavavajillas_operation_state': { state: 'Aborting' }, 'sensor.lavavajillas_program_progress': { state: '30' } },
     warnings: {

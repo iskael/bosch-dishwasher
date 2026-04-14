@@ -37,6 +37,9 @@ class BoschDishwasherCard extends LitElement {
     this.hass.callService(domain, service, { entity_id, ...data });
   }
 
+  // NOTE: Displayed as-is. The Bosch HA integration typically returns a human-readable
+  // string (e.g. "42 min"). If your integration returns an ISO timestamp or epoch
+  // integer, format it here before returning.
   _finishTime() {
     const s = this._state('sensor', 'program_finish_time');
     if (!s || s === 'unavailable' || s === '0') return null;
@@ -174,7 +177,7 @@ class BoschDishwasherCard extends LitElement {
                 @change=${(e) => this._call('select','select_option','selected_program',{ option: e.target.value })}>
                 ${programOptions.length === 0
                   ? html`<option disabled>—</option>`
-                  : programOptions.map(opt => html`<option value="${opt}" ?selected=${opt === this._state('select','selected_program')}>${opt}</option>`)}
+                  : programOptions.map(opt => html`<option value="${opt}">${opt}</option>`)}
               </select>
               <button
                 class="ctrl-btn danger"
