@@ -48,6 +48,10 @@ class BoschDishwasherCard extends LitElement {
     return s === 'on' || s === 'true';
   }
 
+  _isDoorOpen() {
+    return this._state('sensor', 'door').toLowerCase() === 'open';
+  }
+
   _operationState() {
     return this._state('sensor', 'operation_state').toLowerCase();
   }
@@ -95,6 +99,10 @@ class BoschDishwasherCard extends LitElement {
     const activeProgram   = this._state('select', 'active_program');
     const selectedProgram = this._state('select', 'selected_program');
     const displayProgram  = (activeProgram !== 'unavailable' ? activeProgram : selectedProgram);
+    const doorOpen   = this._isDoorOpen();
+    const saltWarn   = this._isWarning('sensor', 'salt_nearly_empty');
+    const rinseWarn  = this._isWarning('sensor', 'rinse_aid_nearly_empty');
+    const remoteOn   = this._state('binary_sensor', 'remote_control') === 'on';
 
     return html`
       <ha-card>
@@ -124,25 +132,25 @@ class BoschDishwasherCard extends LitElement {
 
           <!-- Sensors grid -->
           <div class="sensors">
-            <div class="sensor ${this._state('sensor','door').toLowerCase() === 'open' ? 'warn' : ''}">
+            <div class="sensor ${doorOpen ? 'warn' : ''}">
               <span class="sensor-icon">🚪</span>
               <span class="sensor-label">Puerta</span>
-              <span class="sensor-value">${this._state('sensor','door').toLowerCase() === 'open' ? '⚠ Abierta' : 'Cerrada'}</span>
+              <span class="sensor-value">${doorOpen ? '⚠ Abierta' : 'Cerrada'}</span>
             </div>
-            <div class="sensor ${this._isWarning('sensor','salt_nearly_empty') ? 'warn' : ''}">
+            <div class="sensor ${saltWarn ? 'warn' : ''}">
               <span class="sensor-icon">🧂</span>
               <span class="sensor-label">Sal</span>
-              <span class="sensor-value">${this._isWarning('sensor','salt_nearly_empty') ? '⚠ Baja' : 'OK'}</span>
+              <span class="sensor-value">${saltWarn ? '⚠ Baja' : 'OK'}</span>
             </div>
-            <div class="sensor ${this._isWarning('sensor','rinse_aid_nearly_empty') ? 'warn' : ''}">
+            <div class="sensor ${rinseWarn ? 'warn' : ''}">
               <span class="sensor-icon">💧</span>
               <span class="sensor-label">Abrillantador</span>
-              <span class="sensor-value">${this._isWarning('sensor','rinse_aid_nearly_empty') ? '⚠ Bajo' : 'OK'}</span>
+              <span class="sensor-value">${rinseWarn ? '⚠ Bajo' : 'OK'}</span>
             </div>
             <div class="sensor">
               <span class="sensor-icon">📡</span>
               <span class="sensor-label">Remoto</span>
-              <span class="sensor-value">${this._state('binary_sensor','remote_control') === 'on' ? 'ON' : 'OFF'}</span>
+              <span class="sensor-value">${remoteOn ? 'ON' : 'OFF'}</span>
             </div>
           </div>
 
