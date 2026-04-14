@@ -43,6 +43,43 @@ class BoschDishwasherCard extends LitElement {
 
   getCardSize() { return 4; }
 
+  // Entity IDs this card consumes. Used by shouldUpdate() to skip
+  // re-renders triggered by unrelated hass state changes.
+  _watchedEntities() {
+    const p = this.config.entity_prefix;
+    return [
+      `switch.${p}_power`,
+      `switch.${p}_vario_speed`,
+      `switch.${p}_silence_on_demand`,
+      `switch.${p}_extra_dry`,
+      `switch.${p}_half_load`,
+      `select.${p}_active_program`,
+      `select.${p}_selected_program`,
+      `sensor.${p}_door`,
+      `sensor.${p}_operation_state`,
+      `sensor.${p}_program_progress`,
+      `sensor.${p}_program_finish_time`,
+      `sensor.${p}_salt_nearly_empty`,
+      `sensor.${p}_rinse_aid_nearly_empty`,
+      `binary_sensor.${p}_remote_control`,
+    ];
+  }
+
+  // HA fires hass updates for every entity change in the system.
+  // We only care about our ~14 entities, so skip renders when none of
+  // their state-object references changed (HA creates new state objects
+  // on every state/attribute change, so reference equality is sufficient).
+  shouldUpdate(changedProps) {
+    if (changedProps.has('config')) return true;
+    if (!changedProps.has('hass')) return false;
+    const oldHass = changedProps.get('hass');
+    if (!oldHass) return true;
+    for (const id of this._watchedEntities()) {
+      if (oldHass.states[id] !== this.hass.states[id]) return true;
+    }
+    return false;
+  }
+
   // Returns the full HA state object for a given domain + suffix.
   // Full entity_id: ${domain}.${entity_prefix}_${suffix}
   _entity(domain, suffix) {
@@ -142,12 +179,14 @@ class BoschDishwasherCard extends LitElement {
     const rinseWarn  = this._isWarning('sensor', 'rinse_aid_nearly_empty');
     const remoteOn   = this._state('binary_sensor', 'remote_control') === 'on';
 
-    const powerOn        = this._state('switch', 'power') === 'on';
-    const turboOn        = this._state('switch', 'vario_speed') === 'on';
-    const silenceOn      = this._state('switch', 'silence_on_demand') === 'on';
-    const extraDryOn     = this._state('switch', 'extra_dry') === 'on';
-    const halfLoadOn     = this._state('switch', 'half_load') === 'on';
-    const programOptions = this._attr('select', 'selected_program', 'options') ?? [];
+    const powerOn          = this._state('switch', 'power') === 'on';
+    const turboOn          = this._state('switch', 'vario_speed') === 'on';
+    const silenceState     = this._state('switch', 'silence_on_demand');
+    const silenceOn        = silenceState === 'on';
+    const silenceAvailable = silenceState !== 'unavailable';
+    const extraDryOn       = this._state('switch', 'extra_dry') === 'on';
+    const halfLoadOn       = this._state('switch', 'half_load') === 'on';
+    const programOptions   = this._attr('select', 'selected_program', 'options') ?? [];
 
     return html`
       <ha-card>
@@ -210,7 +249,7 @@ class BoschDishwasherCard extends LitElement {
               </button>
               <select
                 class="ctrl-select"
-                .value=${this._state('select', 'selected_program')}
+                .value=${selectedProgram}
                 @change=${(e) => this._call('select','select_option','selected_program',{ option: e.target.value })}>
                 ${programOptions.length === 0
                   ? html`<option disabled>—</option>`
@@ -218,12 +257,12 @@ class BoschDishwasherCard extends LitElement {
               </select>
               <button
                 class="ctrl-btn danger"
-                ?disabled=${!this._isRunning()}
+                ?disabled=${!running}
                 @click=${() => this._call('button','press','stop_program')}>
                 ⏹ STOP
               </button>
             </div>
-            <div class="controls-row">
+            <div class="controls-grid">
               <button
                 class="ctrl-btn ${turboOn ? 'active' : ''}"
                 @click=${() => this._call('switch','toggle','vario_speed')}>
@@ -231,6 +270,7 @@ class BoschDishwasherCard extends LitElement {
               </button>
               <button
                 class="ctrl-btn ${silenceOn ? 'active' : ''}"
+                ?disabled=${!silenceAvailable}
                 @click=${() => this._call('switch','toggle','silence_on_demand')}>
                 🔇 SILENCIO
               </button>
@@ -258,6 +298,10 @@ class BoschDishwasherCard extends LitElement {
       color: #e6edf3;
       border-radius: 12px;
       overflow: hidden;
+      /* Pause rendering (and any CSS animations inside) when the card
+         is scrolled out of the viewport — saves paint/composite cost. */
+      content-visibility: auto;
+      contain-intrinsic-size: 0 260px;
     }
     .card-content {
       padding: 16px;
@@ -359,7 +403,7 @@ class BoschDishwasherCard extends LitElement {
       gap: 6px;
       border: 1px solid #21262d;
     }
-    .sensor.warn { border-color: #f59e0b40; }
+    .sensor.warn { border-color: #f59e0b; background: #f59e0b15; }
     .sensor-icon  { font-size: 14px; }
     .sensor-label { color: #8b949e; font-size: 11px; flex: 1; }
     .sensor-value { font-size: 11px; color: #e6edf3; }
@@ -373,6 +417,11 @@ class BoschDishwasherCard extends LitElement {
     }
     .controls-row { display: flex; gap: 6px; margin-bottom: 6px; }
     .controls-row:last-child { margin-bottom: 0; }
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
 
     .ctrl-btn {
       background: #21262d;
