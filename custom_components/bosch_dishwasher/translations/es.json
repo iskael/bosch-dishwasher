@@ -1,0 +1,105 @@
+{
+  "application_credentials": {
+    "description": "Crea tu aplicación de desarrollador en [el Portal de Desarrolladores de Home Connect]({applications_url}) y pega aquí el **Client ID** y el **Client Secret**. La URL de redirección de la aplicación debe configurarse como `{redirect_url}`."
+  },
+  "config": {
+    "abort": {
+      "already_configured": "Esta cuenta de Home Connect ya está configurada.",
+      "wrong_account": "Vuelve a autenticarte con la misma cuenta de Home Connect."
+    },
+    "create_entry": {
+      "default": "Autenticación correcta con Home Connect."
+    },
+    "step": {
+      "reauth_confirm": {
+        "description": "La integración Bosch Dishwasher necesita volver a autenticar tu cuenta de Home Connect.",
+        "title": "Volver a autenticar Bosch Dishwasher"
+      }
+    }
+  },
+  "exceptions": {
+    "set_option": {"message": "No se pudo aplicar la opción: {error}"},
+    "set_setting": {"message": "No se pudo cambiar el ajuste: {error}"},
+    "set_power": {"message": "No se pudo cambiar el estado de encendido: {error}"},
+    "select_program": {"message": "No se pudo seleccionar el programa: {error}"},
+    "press_command": {"message": "No se pudo enviar el comando: {error}"},
+    "stop_program": {"message": "No se pudo detener el programa: {error}"},
+    "unknown_program": {"message": "Programa de lavavajillas desconocido: {program}"}
+  },
+  "entity": {
+    "binary_sensor": {
+      "remote_control": {"name": "Control remoto"},
+      "remote_control_start_allowed": {"name": "Inicio remoto"},
+      "local_control": {"name": "Control local"},
+      "salt_nearly_empty": {"name": "Sal casi vacía"},
+      "rinse_aid_nearly_empty": {"name": "Abrillantador casi vacío"},
+      "connected": {"name": "Conectado"}
+    },
+    "button": {
+      "open_door": {"name": "Abrir puerta"},
+      "partly_open_door": {"name": "Entreabrir puerta"},
+      "pause_program": {"name": "Pausar programa"},
+      "resume_program": {"name": "Reanudar programa"},
+      "stop_program": {"name": "Detener programa"}
+    },
+    "select": {
+      "active_program": {"name": "Programa activo"},
+      "selected_program": {"name": "Programa seleccionado"}
+    },
+    "sensor": {
+      "operation_state": {
+        "name": "Estado de operación",
+        "state": {
+          "inactive": "Inactivo",
+          "ready": "Listo",
+          "delayed_start": "Inicio diferido",
+          "run": "En marcha",
+          "pause": "En pausa",
+          "action_required": "Acción requerida",
+          "finished": "Finalizado",
+          "error": "Error",
+          "aborting": "Cancelando"
+        }
+      },
+      "door_state": {
+        "name": "Puerta",
+        "state": {
+          "open": "Abierta",
+          "closed": "Cerrada",
+          "locked": "Bloqueada"
+        }
+      },
+      "program_progress": {"name": "Progreso del programa"},
+      "remaining_program_time": {"name": "Tiempo restante"},
+      "program_finished": {
+        "name": "Programa finalizado",
+        "state": {
+          "off": "Apagado",
+          "present": "Presente",
+          "confirmed": "Confirmado"
+        }
+      },
+      "program_aborted": {
+        "name": "Programa cancelado",
+        "state": {
+          "off": "Apagado",
+          "present": "Presente",
+          "confirmed": "Confirmado"
+        }
+      }
+    },
+    "switch": {
+      "power": {"name": "Encendido"},
+      "child_lock": {"name": "Bloqueo infantil"},
+      "intensiv_zone": {"name": "Zona intensiva"},
+      "brilliance_dry": {"name": "Secado brillante"},
+      "vario_speed_plus": {"name": "VarioSpeed+"},
+      "silence_on_demand": {"name": "Silencio bajo demanda"},
+      "half_load": {"name": "Media carga"},
+      "extra_dry": {"name": "Secado extra"},
+      "hygiene_plus": {"name": "Higiene+"},
+      "eco_dry": {"name": "Secado eco"},
+      "zeolite_dry": {"name": "Secado zeolita"}
+    }
+  }
+}

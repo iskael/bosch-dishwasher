@@ -1,0 +1,20 @@
+{
+  "domain": "bosch_dishwasher",
+  "name": "Bosch Dishwasher",
+  "codeowners": ["@iskael"],
+  "config_flow": true,
+  "dependencies": ["application_credentials"],
+  "dhcp": [
+    {"hostname": "balay-*", "macaddress": "68A40E*"},
+    {"hostname": "bosch-*", "macaddress": "68A40E*"},
+    {"hostname": "neff-*", "macaddress": "68A40E*"},
+    {"hostname": "siemens-*", "macaddress": "68A40E*"}
+  ],
+  "documentation": "https://github.com/iskael/bosch-dishwasher",
+  "integration_type": "hub",
+  "iot_class": "cloud_push",
+  "loggers": ["aiohomeconnect"],
+  "quality_scale": "bronze",
+  "requirements": ["aiohomeconnect==0.36.0"],
+  "version": "0.2.0"
+}
