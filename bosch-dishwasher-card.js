@@ -154,8 +154,42 @@ class BoschDishwasherCard extends LitElement {
             </div>
           </div>
 
-          <!-- Controls — placeholder -->
-          <div style="color:#444c56;font-size:11px;">controls coming…</div>
+          <!-- Controls -->
+          <div class="controls">
+            <div class="controls-label">CONTROLES</div>
+            <div class="controls-row">
+              <button
+                class="ctrl-btn ${this._state('switch','power') === 'on' ? 'active' : ''}"
+                @click=${() => this._call('switch','toggle','power')}>
+                ⏻ ${this._state('switch','power') === 'on' ? 'ON' : 'OFF'}
+              </button>
+              <select
+                class="ctrl-select"
+                @change=${(e) => this._call('select','select_option','selected_program',{ option: e.target.value })}>
+                ${(this._attr('select','selected_program','options') ?? []).map(opt => html`
+                  <option value=${opt} ?selected=${opt === this._state('select','selected_program')}>${opt}</option>
+                `)}
+              </select>
+              <button
+                class="ctrl-btn danger"
+                ?disabled=${!this._isRunning()}
+                @click=${() => this._call('button','press','stop_program')}>
+                ⏹ STOP
+              </button>
+            </div>
+            <div class="controls-row">
+              <button
+                class="ctrl-btn ${this._state('switch','vario_speed') === 'on' ? 'active' : ''}"
+                @click=${() => this._call('switch','toggle','vario_speed')}>
+                ⚡ TURBO
+              </button>
+              <button
+                class="ctrl-btn ${this._state('switch','silence_on_demand') === 'on' ? 'active' : ''}"
+                @click=${() => this._call('switch','toggle','silence_on_demand')}>
+                🔇 SILENCIO
+              </button>
+            </div>
+          </div>
 
         </div>
       </ha-card>
@@ -274,6 +308,45 @@ class BoschDishwasherCard extends LitElement {
     .sensor-label { color: #8b949e; font-size: 11px; flex: 1; }
     .sensor-value { font-size: 11px; color: #e6edf3; }
     .sensor.warn .sensor-value { color: #f59e0b; }
+
+    /* ── Controls ── */
+    .controls { border-top: 1px solid #21262d; padding-top: 10px; }
+    .controls-label {
+      color: #444c56; font-size: 10px;
+      letter-spacing: 1px; margin-bottom: 6px;
+    }
+    .controls-row { display: flex; gap: 6px; margin-bottom: 6px; }
+    .controls-row:last-child { margin-bottom: 0; }
+
+    .ctrl-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      font-size: 11px;
+      padding: 6px 10px;
+      cursor: pointer;
+      flex: 1;
+      transition: border-color .15s, color .15s, background .15s;
+    }
+    .ctrl-btn:hover:not(:disabled) { border-color: #00b4d8; color: #00b4d8; }
+    .ctrl-btn.active { background: #00b4d820; border-color: #00b4d850; color: #00b4d8; }
+    .ctrl-btn.danger { color: #ef4444; border-color: #ef444440; }
+    .ctrl-btn.danger:hover:not(:disabled) { background: #ef444420; border-color: #ef4444; }
+    .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .ctrl-select {
+      flex: 2;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #00b4d8;
+      font-size: 11px;
+      padding: 6px 8px;
+      cursor: pointer;
+      outline: none;
+    }
+    .ctrl-select:focus { border-color: #00b4d8; }
   `;
 }
 
