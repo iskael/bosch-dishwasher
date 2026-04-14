@@ -69,7 +69,12 @@
       states[id] = { ...val, attributes: { ...val.attributes } };
     }
     for (const [id, patch] of Object.entries(overrides)) {
-      states[id] = { ...(states[id] || {}), attributes: {}, ...patch };
+      const base = states[id] || {};
+      states[id] = {
+        ...base,
+        ...patch,
+        attributes: { ...(base.attributes || {}), ...(patch.attributes || {}) },
+      };
     }
     return {
       states,

@@ -32,6 +32,7 @@ class BoschDishwasherCard extends LitElement {
 
   // Calls a HA service. suffix is used to construct the entity_id.
   _call(domain, service, suffix, data = {}) {
+    if (!this.hass) return;
     const entity_id = `${domain}.${this.config.entity_prefix}_${suffix}`;
     this.hass.callService(domain, service, { entity_id, ...data });
   }
