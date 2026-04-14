@@ -2,9 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Development
+## Build step
 
-No build step. The card is a single ES module file served directly by HA.
+Source lives in `src/bosch-dishwasher-card.js` — **this is what you edit**. The root `bosch-dishwasher-card.js` is a build artifact produced by esbuild (Lit is bundled in, no CDN).
+
+```bash
+npm install                 # one-time
+npm run build               # minified ESM bundle → ./bosch-dishwasher-card.js
+npm run build:dev           # sourcemapped, non-minified (for dev/test.html)
+```
+
+**Never hand-edit the root `bosch-dishwasher-card.js`.** `dev/test.html` loads it, so after editing the source you must rebuild to see changes. Commit the rebuilt bundle alongside source changes — HACS downloads from `main`, not release assets.
+
+## Development
 
 ```bash
 # Local dev server (required — file:// blocks ES module imports)
@@ -18,7 +28,7 @@ After deploying a new version of `bosch-dishwasher-card.js` to HA, browsers aggr
 
 ## Architecture
 
-**Single file:** `bosch-dishwasher-card.js` — a LitElement custom element registered as `bosch-dishwasher-card`. Lit is imported via CDN (`https://unpkg.com/lit?module`), no bundler.
+**Source file:** `src/bosch-dishwasher-card.js` — a LitElement custom element registered as `bosch-dishwasher-card`. Lit is imported as `from 'lit'` and bundled by esbuild into the root `bosch-dishwasher-card.js`.
 
 **Entity ID convention:** All entity IDs are constructed from `entity_prefix` config:
 ```
