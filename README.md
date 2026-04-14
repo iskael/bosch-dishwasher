@@ -2,7 +2,7 @@
 
 Home Assistant Lovelace card for Bosch dishwashers via the Home Connect integration. Dark industrial UI with an animated spray arm, status badge, sensor tiles, and inline program/option controls.
 
-![preview](docs/images/card-running.png)
+![preview](https://raw.githubusercontent.com/iskael/bosch-dishwasher/main/docs/images/card-running.png)
 
 ## Features
 
