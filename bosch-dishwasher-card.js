@@ -43,6 +43,11 @@ class BoschDishwasherCard extends LitElement {
     return s;
   }
 
+  _isWarning(domain, suffix) {
+    const s = this._state(domain, suffix).toLowerCase();
+    return s === 'on' || s === 'true';
+  }
+
   _operationState() {
     return this._state('sensor', 'operation_state').toLowerCase();
   }
@@ -117,8 +122,32 @@ class BoschDishwasherCard extends LitElement {
             </div>
           </div>
 
-          <!-- Sensors and controls — placeholder for next tasks -->
-          <div style="color:#444c56;font-size:11px;">sensors + controls coming…</div>
+          <!-- Sensors grid -->
+          <div class="sensors">
+            <div class="sensor ${this._state('sensor','door').toLowerCase() === 'open' ? 'warn' : ''}">
+              <span class="sensor-icon">🚪</span>
+              <span class="sensor-label">Puerta</span>
+              <span class="sensor-value">${this._state('sensor','door').toLowerCase() === 'open' ? '⚠ Abierta' : 'Cerrada'}</span>
+            </div>
+            <div class="sensor ${this._isWarning('sensor','salt_nearly_empty') ? 'warn' : ''}">
+              <span class="sensor-icon">🧂</span>
+              <span class="sensor-label">Sal</span>
+              <span class="sensor-value">${this._isWarning('sensor','salt_nearly_empty') ? '⚠ Baja' : 'OK'}</span>
+            </div>
+            <div class="sensor ${this._isWarning('sensor','rinse_aid_nearly_empty') ? 'warn' : ''}">
+              <span class="sensor-icon">💧</span>
+              <span class="sensor-label">Abrillantador</span>
+              <span class="sensor-value">${this._isWarning('sensor','rinse_aid_nearly_empty') ? '⚠ Bajo' : 'OK'}</span>
+            </div>
+            <div class="sensor">
+              <span class="sensor-icon">📡</span>
+              <span class="sensor-label">Remoto</span>
+              <span class="sensor-value">${this._state('binary_sensor','remote_control') === 'on' ? 'ON' : 'OFF'}</span>
+            </div>
+          </div>
+
+          <!-- Controls — placeholder -->
+          <div style="color:#444c56;font-size:11px;">controls coming…</div>
 
         </div>
       </ha-card>
@@ -216,6 +245,27 @@ class BoschDishwasherCard extends LitElement {
       0%, 100% { opacity: 1; }
       50%      { opacity: 0.65; }
     }
+
+    /* ── Sensors ── */
+    .sensors {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .sensor {
+      background: #161b22;
+      border-radius: 6px;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #21262d;
+    }
+    .sensor.warn { border-color: #f59e0b40; }
+    .sensor-icon  { font-size: 14px; }
+    .sensor-label { color: #8b949e; font-size: 11px; flex: 1; }
+    .sensor-value { font-size: 11px; color: #e6edf3; }
+    .sensor.warn .sensor-value { color: #f59e0b; }
   `;
 }
 
