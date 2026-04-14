@@ -33,14 +33,6 @@ The Home Connect integration currently supports **one Home Connect account per H
 
 The card reads the subset of entities the integration exposes for dishwashers (operation state, door, program progress, finish time, salt / rinse aid warnings, active and selected program, power, and the option switches for Vario Speed, Silence on Demand, Extra Dry and Half Load). Additional dishwasher options some models expose (Intensiv Zone, Brilliance Dry, Hygiene Plus, Eco Dry, Zeolite Dry) are **not** surfaced by this card — use a separate entities card alongside it if you need them.
 
-## Installation via HACS (Custom Repository)
-
-1. Make sure [HACS](https://hacs.xyz) is installed.
-2. HACS → Frontend → ⋮ (top right) → **Custom repositories**.
-3. Repository: `https://github.com/iskael/bosch-dishwasher`, Category: **Lovelace**.
-4. Click **Add** → find "Bosch Dishwasher Card" in the list → **Download** → restart / refresh if prompted.
-5. HACS registers the resource automatically. If the custom element is not found, hard refresh the dashboard (Cmd/Ctrl+Shift+R).
-
 ## Manual installation
 
 1. Copy `bosch-dishwasher-card.js` into your HA config:
