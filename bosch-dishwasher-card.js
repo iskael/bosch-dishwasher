@@ -145,15 +145,90 @@ class BoschDishwasherCard extends LitElement {
     return isNaN(n) ? 0 : Math.min(100, Math.max(0, n));
   }
 
-  _renderSprayArm() {
+  // Front-view illustration of a built-in dishwasher inspired by
+  // Bosch Series 6 (no branding / trademarks). State-driven:
+  //   running:  cyan LED pulse, blinking digital display, falling water drops
+  //   finished: steady green LED, "DONE" on display
+  //   aborted:  steady red LED, "STOP" on display
+  //   idle:     dim grey, no animation
+  _renderDishwasher(state) {
+    const displayText =
+      state === 'running'  ? '••••' :
+      state === 'finished' ? 'DONE' :
+      state === 'aborted'  ? 'STOP' : '----';
     return html`
-      <svg class="spray-arm" viewBox="0 0 48 48" width="36" height="36">
-        <g class="arm-group">
-          <rect x="4" y="22" width="40" height="4" rx="2" fill="#00b4d8"/>
-          <ellipse cx="6" cy="18" rx="3" ry="5" fill="#48cae4" class="nozzle nozzle-left"/>
-          <ellipse cx="42" cy="18" rx="3" ry="5" fill="#48cae4" class="nozzle nozzle-right"/>
+      <svg class="bosch-dw ${state}" viewBox="0 0 80 110" width="72" height="100" aria-hidden="true">
+        <defs>
+          <linearGradient id="dw-door" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#2a3441"/>
+            <stop offset="50%"  stop-color="#1f2833"/>
+            <stop offset="100%" stop-color="#161b22"/>
+          </linearGradient>
+          <linearGradient id="dw-gloss" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.1"/>
+            <stop offset="40%"  stop-color="#ffffff" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="dw-handle" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="#555d66"/>
+            <stop offset="50%"  stop-color="#8b949e"/>
+            <stop offset="100%" stop-color="#30363d"/>
+          </linearGradient>
+          <clipPath id="dw-door-clip">
+            <rect x="6" y="26" width="68" height="74" rx="2"/>
+          </clipPath>
+        </defs>
+
+        <!-- ground shadow -->
+        <ellipse cx="40" cy="106" rx="32" ry="1.8" fill="#000" opacity="0.35"/>
+
+        <!-- feet -->
+        <rect x="10" y="100" width="5" height="4" fill="#0d1117"/>
+        <rect x="65" y="100" width="5" height="4" fill="#0d1117"/>
+
+        <!-- main door -->
+        <rect x="6" y="26" width="68" height="74" rx="2"
+              fill="url(#dw-door)" stroke="#30363d" stroke-width="1"/>
+        <rect x="6" y="26" width="68" height="74" rx="2" fill="url(#dw-gloss)"/>
+
+        <!-- falling water drops (only rendered when running) -->
+        <g clip-path="url(#dw-door-clip)" class="water-drops">
+          <circle class="drop d1" cx="18" cy="30" r="1.2" fill="#48cae4"/>
+          <circle class="drop d2" cx="32" cy="28" r="1.0" fill="#48cae4"/>
+          <circle class="drop d3" cx="48" cy="31" r="1.3" fill="#48cae4"/>
+          <circle class="drop d4" cx="62" cy="29" r="1.0" fill="#48cae4"/>
+          <circle class="drop d5" cx="24" cy="32" r="1.1" fill="#48cae4"/>
+          <circle class="drop d6" cx="56" cy="30" r="1.2" fill="#48cae4"/>
         </g>
-        <circle cx="24" cy="24" r="3" fill="#0077b6"/>
+
+        <!-- subtle brand accent strip -->
+        <rect x="32" y="62" width="16" height="0.8" fill="#8b949e" opacity="0.25"/>
+
+        <!-- control panel (top strip) -->
+        <rect x="6" y="6" width="68" height="16" rx="1.5"
+              fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+
+        <!-- status LED -->
+        <circle cx="12" cy="14" r="1.8" class="led"/>
+        <circle cx="12" cy="14" r="2.8" class="led-glow"/>
+
+        <!-- digital display -->
+        <rect x="28" y="10" width="24" height="8" rx="0.8" fill="#001015"
+              stroke="#00b4d830" stroke-width="0.4"/>
+        <text x="40" y="16" text-anchor="middle"
+              font-size="5" font-family="monospace"
+              font-weight="bold" fill="#00b4d8"
+              class="display-text">${displayText}</text>
+
+        <!-- program indicator dots -->
+        <circle cx="60" cy="12" r="0.8" fill="#30363d"/>
+        <circle cx="64" cy="12" r="0.8" fill="#30363d"/>
+        <circle cx="68" cy="12" r="0.8" fill="#30363d"/>
+        <circle cx="60" cy="16" r="0.8" fill="#30363d"/>
+        <circle cx="64" cy="16" r="0.8" fill="#30363d"/>
+        <circle cx="68" cy="16" r="0.8" fill="#30363d"/>
+
+        <!-- handle (below control panel) -->
+        <rect x="14" y="29" width="52" height="4" rx="2" fill="url(#dw-handle)"/>
       </svg>
     `;
   }
@@ -164,6 +239,10 @@ class BoschDishwasherCard extends LitElement {
     const name        = this.config.name ?? this.config.entity_prefix;
     const running     = this._isRunning();
     const badge       = this._badge();
+    const dwState     = running                          ? 'running'
+                      : badge.cls === 'badge-finished'   ? 'finished'
+                      : badge.cls === 'badge-aborted'    ? 'aborted'
+                      :                                    'idle';
     const progress    = this._progress();
     const finishTime  = this._finishTime();
     const activeProgram   = this._state('select', 'active_program');
@@ -194,10 +273,8 @@ class BoschDishwasherCard extends LitElement {
 
           <!-- Header zone -->
           <div class="header">
-            <div class="icon-box ${running ? 'running' : ''}">
-              ${running
-                ? this._renderSprayArm()
-                : html`<span class="icon-static">🍽️</span>`}
+            <div class="dw-illustration">
+              ${this._renderDishwasher(dwState)}
             </div>
             <div class="header-info">
               <div class="header-top">
@@ -313,20 +390,12 @@ class BoschDishwasherCard extends LitElement {
     /* ── Header ── */
     .header { display: flex; align-items: flex-start; gap: 12px; }
 
-    .icon-box {
-      width: 56px; height: 56px;
-      background: #161b22;
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
+    .dw-illustration {
       flex-shrink: 0;
-      border: 1px solid #21262d;
-      transition: box-shadow .3s;
+      width: 72px; height: 100px;
+      display: flex; align-items: center; justify-content: center;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
     }
-    .icon-box.running {
-      border-color: #00b4d830;
-      animation: pulse-glow 2s ease-in-out infinite;
-    }
-    .icon-static { font-size: 28px; opacity: 0.4; }
 
     .header-info { flex: 1; min-width: 0; }
     .header-top {
@@ -362,29 +431,56 @@ class BoschDishwasherCard extends LitElement {
     }
     .progress-label { font-size: 11px; color: #8b949e; }
 
-    /* Spray arm SVG */
-    .spray-arm .arm-group {
-      transform-origin: 50% 50%;
-      animation: spin 2s linear infinite;
-    }
-    .nozzle-left  { animation: spray 1s ease-in-out infinite; }
-    .nozzle-right { animation: spray 1s ease-in-out infinite .5s; }
+    /* ── Dishwasher SVG ── */
+    .bosch-dw { display: block; transition: opacity .3s; }
+    .bosch-dw.idle { opacity: 0.55; }
+
+    /* Status LED */
+    .bosch-dw .led      { transition: fill .3s; }
+    .bosch-dw .led-glow { transition: fill .3s, opacity .3s; opacity: 0; filter: blur(1.5px); }
+    .bosch-dw.idle     .led { fill: #444c56; }
+    .bosch-dw.running  .led, .bosch-dw.running  .led-glow { fill: #00b4d8; }
+    .bosch-dw.finished .led, .bosch-dw.finished .led-glow { fill: #34d399; }
+    .bosch-dw.aborted  .led, .bosch-dw.aborted  .led-glow { fill: #ef4444; }
+    .bosch-dw.running  .led-glow,
+    .bosch-dw.finished .led-glow,
+    .bosch-dw.aborted  .led-glow { opacity: 0.8; }
+    .bosch-dw.running .led { animation: led-pulse 1.5s ease-in-out infinite; }
+
+    /* Digital display */
+    .bosch-dw .display-text { transition: fill .3s; }
+    .bosch-dw.idle     .display-text { fill: #30363d; }
+    .bosch-dw.finished .display-text { fill: #34d399; }
+    .bosch-dw.aborted  .display-text { fill: #ef4444; }
+    .bosch-dw.running  .display-text { animation: blink-text 1s step-end infinite; }
+
+    /* Water drops — only visible when running */
+    .water-drops .drop { opacity: 0; }
+    .bosch-dw.running .water-drops .drop { animation: drop-fall 2.2s linear infinite; }
+    .bosch-dw.running .water-drops .d1 { animation-delay: 0s;    }
+    .bosch-dw.running .water-drops .d2 { animation-delay: 0.35s; }
+    .bosch-dw.running .water-drops .d3 { animation-delay: 0.7s;  }
+    .bosch-dw.running .water-drops .d4 { animation-delay: 1.05s; }
+    .bosch-dw.running .water-drops .d5 { animation-delay: 1.4s;  }
+    .bosch-dw.running .water-drops .d6 { animation-delay: 1.75s; }
 
     /* Keyframes */
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
+    @keyframes drop-fall {
+      0%   { transform: translateY(-4px); opacity: 0; }
+      12%  { opacity: 0.85; }
+      88%  { opacity: 0.85; }
+      100% { transform: translateY(70px); opacity: 0; }
     }
-    @keyframes spray {
-      0%, 100% { opacity: 0.9; }
-      50%      { opacity: 0.3; }
+    @keyframes led-pulse {
+      0%, 100% { opacity: 1;    }
+      50%      { opacity: 0.35; }
     }
-    @keyframes pulse-glow {
-      0%, 100% { box-shadow: 0 0 8px #00b4d8; }
-      50%      { box-shadow: 0 0 20px #00b4d8, 0 0 40px #0077b640; }
+    @keyframes blink-text {
+      0%, 100% { opacity: 1;    }
+      50%      { opacity: 0.45; }
     }
     @keyframes blink-badge {
-      0%, 100% { opacity: 1; }
+      0%, 100% { opacity: 1;    }
       50%      { opacity: 0.65; }
     }
 
