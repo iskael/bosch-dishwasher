@@ -145,6 +145,8 @@ class BoschDishwasherCard extends LitElement {
     const powerOn        = this._state('switch', 'power') === 'on';
     const turboOn        = this._state('switch', 'vario_speed') === 'on';
     const silenceOn      = this._state('switch', 'silence_on_demand') === 'on';
+    const extraDryOn     = this._state('switch', 'extra_dry') === 'on';
+    const halfLoadOn     = this._state('switch', 'half_load') === 'on';
     const programOptions = this._attr('select', 'selected_program', 'options') ?? [];
 
     return html`
@@ -231,6 +233,16 @@ class BoschDishwasherCard extends LitElement {
                 class="ctrl-btn ${silenceOn ? 'active' : ''}"
                 @click=${() => this._call('switch','toggle','silence_on_demand')}>
                 🔇 SILENCIO
+              </button>
+              <button
+                class="ctrl-btn ${extraDryOn ? 'active' : ''}"
+                @click=${() => this._call('switch','toggle','extra_dry')}>
+                🌡 EXTRA SECO
+              </button>
+              <button
+                class="ctrl-btn ${halfLoadOn ? 'active' : ''}"
+                @click=${() => this._call('switch','toggle','half_load')}>
+                ½ MEDIA CARGA
               </button>
             </div>
           </div>
