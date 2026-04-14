@@ -1,163 +1,7 @@
-import { LitElement, html, css } from 'https://unpkg.com/lit?module';
-
-// Maps Home Connect internal program keys to human-readable labels.
-// Keys from the Bosch integration use the dishcare_dishwasher_program_* namespace.
-const PROGRAM_NAMES = {
-  dishcare_dishwasher_program_intensiv_70:   'Intensive 70°C',
-  dishcare_dishwasher_program_auto_2:        'Auto 2',
-  dishcare_dishwasher_program_eco_50:        'Eco 50°C',
-  dishcare_dishwasher_program_pre_rinse:     'Pre-rinse',
-  dishcare_dishwasher_program_night_wash:    'Night wash',
-  dishcare_dishwasher_program_kurz_60:       'Speed 60°C',
-  dishcare_dishwasher_program_machine_care:  'Machine care',
-  dishcare_dishwasher_program_quick_45:      'Quick 45°C',
-  dishcare_dishwasher_program_intensiv_power:'Intensive power',
-  dishcare_dishwasher_program_super_60:      'Super 60°C',
-  dishcare_dishwasher_program_mixed_load:    'Mixed load',
-  dishcare_dishwasher_program_glas_40:       'Glass 40°C',
-};
-
-// Returns a human-readable label for a program key.
-// Falls back to a formatted version of the key for unknown programs.
-function programLabel(key) {
-  if (!key || key === 'unavailable' || key === 'unknown') return key;
-  if (PROGRAM_NAMES[key]) return PROGRAM_NAMES[key];
-  // Fallback: strip common prefix, format remainder
-  return key
-    .replace(/^.*_program_/, '')       // strip dishcare_..._program_
-    .replace(/_(\d+)$/, ' $1°C')       // trailing number → " 70°C"
-    .replace(/_/g, ' ')                // underscores → spaces
-    .replace(/\b\w/g, c => c.toUpperCase()); // Title Case
-}
-
-class BoschDishwasherCard extends LitElement {
-  static properties = {
-    hass: { attribute: false },
-    config: { attribute: false },
-  };
-
-  setConfig(config) {
-    if (!config.entity_prefix) throw new Error('entity_prefix is required');
-    this.config = config;
-  }
-
-  getCardSize() { return 4; }
-
-  // Entity IDs this card consumes. Used by shouldUpdate() to skip
-  // re-renders triggered by unrelated hass state changes.
-  _watchedEntities() {
-    const p = this.config.entity_prefix;
-    return [
-      `switch.${p}_power`,
-      `switch.${p}_vario_speed`,
-      `switch.${p}_silence_on_demand`,
-      `switch.${p}_extra_dry`,
-      `switch.${p}_half_load`,
-      `select.${p}_active_program`,
-      `select.${p}_selected_program`,
-      `sensor.${p}_door`,
-      `sensor.${p}_operation_state`,
-      `sensor.${p}_program_progress`,
-      `sensor.${p}_program_finish_time`,
-      `sensor.${p}_salt_nearly_empty`,
-      `sensor.${p}_rinse_aid_nearly_empty`,
-      `binary_sensor.${p}_remote_control`,
-    ];
-  }
-
-  // HA fires hass updates for every entity change in the system.
-  // We only care about our ~14 entities, so skip renders when none of
-  // their state-object references changed (HA creates new state objects
-  // on every state/attribute change, so reference equality is sufficient).
-  shouldUpdate(changedProps) {
-    if (changedProps.has('config')) return true;
-    if (!changedProps.has('hass')) return false;
-    const oldHass = changedProps.get('hass');
-    if (!oldHass) return true;
-    for (const id of this._watchedEntities()) {
-      if (oldHass.states[id] !== this.hass.states[id]) return true;
-    }
-    return false;
-  }
-
-  // Returns the full HA state object for a given domain + suffix.
-  // Full entity_id: ${domain}.${entity_prefix}_${suffix}
-  _entity(domain, suffix) {
-    const id = `${domain}.${this.config.entity_prefix}_${suffix}`;
-    return this.hass?.states[id];
-  }
-
-  // Returns .state string, defaulting to 'unavailable'
-  _state(domain, suffix) {
-    return this._entity(domain, suffix)?.state ?? 'unavailable';
-  }
-
-  // Returns an attribute value
-  _attr(domain, suffix, attr) {
-    return this._entity(domain, suffix)?.attributes?.[attr];
-  }
-
-  // Calls a HA service. suffix is used to construct the entity_id.
-  _call(domain, service, suffix, data = {}) {
-    if (!this.hass) return;
-    const entity_id = `${domain}.${this.config.entity_prefix}_${suffix}`;
-    this.hass.callService(domain, service, { entity_id, ...data });
-  }
-
-  // NOTE: Displayed as-is. The Bosch HA integration typically returns a human-readable
-  // string (e.g. "42 min"). If your integration returns an ISO timestamp or epoch
-  // integer, format it here before returning.
-  _finishTime() {
-    const s = this._state('sensor', 'program_finish_time');
-    if (!s || s === 'unavailable' || s === '0') return null;
-    return s;
-  }
-
-  _isWarning(domain, suffix) {
-    const s = this._state(domain, suffix).toLowerCase();
-    return s === 'on' || s === 'true';
-  }
-
-  _isDoorOpen() {
-    return this._state('sensor', 'door').toLowerCase() === 'open';
-  }
-
-  _operationState() {
-    return this._state('sensor', 'operation_state').toLowerCase();
-  }
-
-  _isRunning() {
-    const s = this._operationState();
-    return s === 'run' || s === 'running';
-  }
-
-  _badge() {
-    const s = this._operationState();
-    if (s === 'run' || s === 'running')      return { text: '● RUNNING',  cls: 'badge-running'  };
-    if (s === 'finished' || s === 'finish')  return { text: '✓ FINISHED', cls: 'badge-finished' };
-    if (s === 'aborting' || s === 'aborted') return { text: '⚠ ABORTED',  cls: 'badge-aborted'  };
-    return { text: s ? s.toUpperCase() : 'IDLE', cls: 'badge-idle' };
-  }
-
-  _progress() {
-    const raw = this._state('sensor', 'program_progress');
-    const n = parseInt(raw, 10);
-    return isNaN(n) ? 0 : Math.min(100, Math.max(0, n));
-  }
-
-  // Front-view illustration of a built-in dishwasher inspired by
-  // Bosch Series 6 (no branding / trademarks). State-driven:
-  //   running:  cyan LED pulse, blinking digital display, falling water drops
-  //   finished: steady green LED, "DONE" on display
-  //   aborted:  steady red LED, "STOP" on display
-  //   idle:     dim grey, no animation
-  _renderDishwasher(state) {
-    const displayText =
-      state === 'running'  ? '••••' :
-      state === 'finished' ? 'DONE' :
-      state === 'aborted'  ? 'STOP' : '----';
-    return html`
-      <svg class="bosch-dw ${state}" viewBox="0 0 80 110" width="72" height="100" aria-hidden="true">
+var Ot=Object.defineProperty;var Pt=(r,t,e)=>t in r?Ot(r,t,{enumerable:!0,configurable:!0,writable:!0,value:e}):r[t]=e;var j=(r,t,e)=>Pt(r,typeof t!="symbol"?t+"":t,e);var D=globalThis,z=D.ShadowRoot&&(D.ShadyCSS===void 0||D.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,B=Symbol(),it=new WeakMap,C=class{constructor(t,e,s){if(this._$cssResult$=!0,s!==B)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e}get styleSheet(){let t=this.o,e=this.t;if(z&&t===void 0){let s=e!==void 0&&e.length===1;s&&(t=it.get(e)),t===void 0&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),s&&it.set(e,t))}return t}toString(){return this.cssText}},rt=r=>new C(typeof r=="string"?r:r+"",void 0,B),W=(r,...t)=>{let e=r.length===1?r[0]:t.reduce((s,i,o)=>s+(n=>{if(n._$cssResult$===!0)return n.cssText;if(typeof n=="number")return n;throw Error("Value passed to 'css' function must be a 'css' function result: "+n+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(i)+r[o+1],r[0]);return new C(e,r,B)},ot=(r,t)=>{if(z)r.adoptedStyleSheets=t.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(let e of t){let s=document.createElement("style"),i=D.litNonce;i!==void 0&&s.setAttribute("nonce",i),s.textContent=e.cssText,r.appendChild(s)}},G=z?r=>r:r=>r instanceof CSSStyleSheet?(t=>{let e="";for(let s of t.cssRules)e+=s.cssText;return rt(e)})(r):r;var{is:kt,defineProperty:Ut,getOwnPropertyDescriptor:Nt,getOwnPropertyNames:Tt,getOwnPropertySymbols:Rt,getPrototypeOf:Mt}=Object,g=globalThis,nt=g.trustedTypes,Ht=nt?nt.emptyScript:"",Lt=g.reactiveElementPolyfillSupport,O=(r,t)=>r,V={toAttribute(r,t){switch(t){case Boolean:r=r?Ht:null;break;case Object:case Array:r=r==null?r:JSON.stringify(r)}return r},fromAttribute(r,t){let e=r;switch(t){case Boolean:e=r!==null;break;case Number:e=r===null?null:Number(r);break;case Object:case Array:try{e=JSON.parse(r)}catch{e=null}}return e}},lt=(r,t)=>!kt(r,t),at={attribute:!0,type:String,converter:V,reflect:!1,useDefault:!1,hasChanged:lt};Symbol.metadata??(Symbol.metadata=Symbol("metadata")),g.litPropertyMetadata??(g.litPropertyMetadata=new WeakMap);var f=class extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??(this.l=[])).push(t)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,e=at){if(e.state&&(e.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(t)&&((e=Object.create(e)).wrapped=!0),this.elementProperties.set(t,e),!e.noAccessor){let s=Symbol(),i=this.getPropertyDescriptor(t,s,e);i!==void 0&&Ut(this.prototype,t,i)}}static getPropertyDescriptor(t,e,s){let{get:i,set:o}=Nt(this.prototype,t)??{get(){return this[e]},set(n){this[e]=n}};return{get:i,set(n){let c=i?.call(this);o?.call(this,n),this.requestUpdate(t,c,s)},configurable:!0,enumerable:!0}}static getPropertyOptions(t){return this.elementProperties.get(t)??at}static _$Ei(){if(this.hasOwnProperty(O("elementProperties")))return;let t=Mt(this);t.finalize(),t.l!==void 0&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties)}static finalize(){if(this.hasOwnProperty(O("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(O("properties"))){let e=this.properties,s=[...Tt(e),...Rt(e)];for(let i of s)this.createProperty(i,e[i])}let t=this[Symbol.metadata];if(t!==null){let e=litPropertyMetadata.get(t);if(e!==void 0)for(let[s,i]of e)this.elementProperties.set(s,i)}this._$Eh=new Map;for(let[e,s]of this.elementProperties){let i=this._$Eu(e,s);i!==void 0&&this._$Eh.set(i,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(t){let e=[];if(Array.isArray(t)){let s=new Set(t.flat(1/0).reverse());for(let i of s)e.unshift(G(i))}else t!==void 0&&e.push(G(t));return e}static _$Eu(t,e){let s=e.attribute;return s===!1?void 0:typeof s=="string"?s:typeof t=="string"?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this))}addController(t){(this._$EO??(this._$EO=new Set)).add(t),this.renderRoot!==void 0&&this.isConnected&&t.hostConnected?.()}removeController(t){this._$EO?.delete(t)}_$E_(){let t=new Map,e=this.constructor.elementProperties;for(let s of e.keys())this.hasOwnProperty(s)&&(t.set(s,this[s]),delete this[s]);t.size>0&&(this._$Ep=t)}createRenderRoot(){let t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return ot(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??(this.renderRoot=this.createRenderRoot()),this.enableUpdating(!0),this._$EO?.forEach(t=>t.hostConnected?.())}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.())}attributeChangedCallback(t,e,s){this._$AK(t,s)}_$ET(t,e){let s=this.constructor.elementProperties.get(t),i=this.constructor._$Eu(t,s);if(i!==void 0&&s.reflect===!0){let o=(s.converter?.toAttribute!==void 0?s.converter:V).toAttribute(e,s.type);this._$Em=t,o==null?this.removeAttribute(i):this.setAttribute(i,o),this._$Em=null}}_$AK(t,e){let s=this.constructor,i=s._$Eh.get(t);if(i!==void 0&&this._$Em!==i){let o=s.getPropertyOptions(i),n=typeof o.converter=="function"?{fromAttribute:o.converter}:o.converter?.fromAttribute!==void 0?o.converter:V;this._$Em=i;let c=n.fromAttribute(e,o.type);this[i]=c??this._$Ej?.get(i)??c,this._$Em=null}}requestUpdate(t,e,s,i=!1,o){if(t!==void 0){let n=this.constructor;if(i===!1&&(o=this[t]),s??(s=n.getPropertyOptions(t)),!((s.hasChanged??lt)(o,e)||s.useDefault&&s.reflect&&o===this._$Ej?.get(t)&&!this.hasAttribute(n._$Eu(t,s))))return;this.C(t,e,s)}this.isUpdatePending===!1&&(this._$ES=this._$EP())}C(t,e,{useDefault:s,reflect:i,wrapped:o},n){s&&!(this._$Ej??(this._$Ej=new Map)).has(t)&&(this._$Ej.set(t,n??e??this[t]),o!==!0||n!==void 0)||(this._$AL.has(t)||(this.hasUpdated||s||(e=void 0),this._$AL.set(t,e)),i===!0&&this._$Em!==t&&(this._$Eq??(this._$Eq=new Set)).add(t))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}let t=this.scheduleUpdate();return t!=null&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??(this.renderRoot=this.createRenderRoot()),this._$Ep){for(let[i,o]of this._$Ep)this[i]=o;this._$Ep=void 0}let s=this.constructor.elementProperties;if(s.size>0)for(let[i,o]of s){let{wrapped:n}=o,c=this[i];n!==!0||this._$AL.has(i)||c===void 0||this.C(i,void 0,o,c)}}let t=!1,e=this._$AL;try{t=this.shouldUpdate(e),t?(this.willUpdate(e),this._$EO?.forEach(s=>s.hostUpdate?.()),this.update(e)):this._$EM()}catch(s){throw t=!1,this._$EM(),s}t&&this._$AE(e)}willUpdate(t){}_$AE(t){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(t)),this.updated(t)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return!0}update(t){this._$Eq&&(this._$Eq=this._$Eq.forEach(e=>this._$ET(e,this[e]))),this._$EM()}updated(t){}firstUpdated(t){}};f.elementStyles=[],f.shadowRootOptions={mode:"open"},f[O("elementProperties")]=new Map,f[O("finalized")]=new Map,Lt?.({ReactiveElement:f}),(g.reactiveElementVersions??(g.reactiveElementVersions=[])).push("2.1.2");var k=globalThis,ct=r=>r,I=k.trustedTypes,dt=I?I.createPolicy("lit-html",{createHTML:r=>r}):void 0,gt="$lit$",b=`lit$${Math.random().toFixed(9).slice(2)}$`,bt="?"+b,Dt=`<${bt}>`,w=document,U=()=>w.createComment(""),N=r=>r===null||typeof r!="object"&&typeof r!="function",X=Array.isArray,zt=r=>X(r)||typeof r?.[Symbol.iterator]=="function",q=`[ 	
+\f\r]`,P=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,ht=/-->/g,pt=/>/g,m=RegExp(`>|${q}(?:([^\\s"'>=/]+)(${q}*=${q}*(?:[^ 	
+\f\r"'\`<>=]|("|')|))|$)`,"g"),ut=/'/g,_t=/"/g,$t=/^(?:script|style|textarea|title)$/i,Z=r=>(t,...e)=>({_$litType$:r,strings:t,values:e}),v=Z(1),Ft=Z(2),Jt=Z(3),x=Symbol.for("lit-noChange"),p=Symbol.for("lit-nothing"),ft=new WeakMap,y=w.createTreeWalker(w,129);function mt(r,t){if(!X(r)||!r.hasOwnProperty("raw"))throw Error("invalid template strings array");return dt!==void 0?dt.createHTML(t):t}var It=(r,t)=>{let e=r.length-1,s=[],i,o=t===2?"<svg>":t===3?"<math>":"",n=P;for(let c=0;c<e;c++){let a=r[c],d,h,l=-1,u=0;for(;u<a.length&&(n.lastIndex=u,h=n.exec(a),h!==null);)u=n.lastIndex,n===P?h[1]==="!--"?n=ht:h[1]!==void 0?n=pt:h[2]!==void 0?($t.test(h[2])&&(i=RegExp("</"+h[2],"g")),n=m):h[3]!==void 0&&(n=m):n===m?h[0]===">"?(n=i??P,l=-1):h[1]===void 0?l=-2:(l=n.lastIndex-h[2].length,d=h[1],n=h[3]===void 0?m:h[3]==='"'?_t:ut):n===_t||n===ut?n=m:n===ht||n===pt?n=P:(n=m,i=void 0);let _=n===m&&r[c+1].startsWith("/>")?" ":"";o+=n===P?a+Dt:l>=0?(s.push(d),a.slice(0,l)+gt+a.slice(l)+b+_):a+b+(l===-2?c:_)}return[mt(r,o+(r[e]||"<?>")+(t===2?"</svg>":t===3?"</math>":"")),s]},T=class r{constructor({strings:t,_$litType$:e},s){let i;this.parts=[];let o=0,n=0,c=t.length-1,a=this.parts,[d,h]=It(t,e);if(this.el=r.createElement(d,s),y.currentNode=this.el.content,e===2||e===3){let l=this.el.content.firstChild;l.replaceWith(...l.childNodes)}for(;(i=y.nextNode())!==null&&a.length<c;){if(i.nodeType===1){if(i.hasAttributes())for(let l of i.getAttributeNames())if(l.endsWith(gt)){let u=h[n++],_=i.getAttribute(l).split(b),A=/([.?@])?(.*)/.exec(u);a.push({type:1,index:o,name:A[2],strings:_,ctor:A[1]==="."?F:A[1]==="?"?J:A[1]==="@"?Y:E}),i.removeAttribute(l)}else l.startsWith(b)&&(a.push({type:6,index:o}),i.removeAttribute(l));if($t.test(i.tagName)){let l=i.textContent.split(b),u=l.length-1;if(u>0){i.textContent=I?I.emptyScript:"";for(let _=0;_<u;_++)i.append(l[_],U()),y.nextNode(),a.push({type:2,index:++o});i.append(l[u],U())}}}else if(i.nodeType===8)if(i.data===bt)a.push({type:2,index:o});else{let l=-1;for(;(l=i.data.indexOf(b,l+1))!==-1;)a.push({type:7,index:o}),l+=b.length-1}o++}}static createElement(t,e){let s=w.createElement("template");return s.innerHTML=t,s}};function S(r,t,e=r,s){if(t===x)return t;let i=s!==void 0?e._$Co?.[s]:e._$Cl,o=N(t)?void 0:t._$litDirective$;return i?.constructor!==o&&(i?._$AO?.(!1),o===void 0?i=void 0:(i=new o(r),i._$AT(r,e,s)),s!==void 0?(e._$Co??(e._$Co=[]))[s]=i:e._$Cl=i),i!==void 0&&(t=S(r,i._$AS(r,t.values),i,s)),t}var K=class{constructor(t,e){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=e}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){let{el:{content:e},parts:s}=this._$AD,i=(t?.creationScope??w).importNode(e,!0);y.currentNode=i;let o=y.nextNode(),n=0,c=0,a=s[0];for(;a!==void 0;){if(n===a.index){let d;a.type===2?d=new R(o,o.nextSibling,this,t):a.type===1?d=new a.ctor(o,a.name,a.strings,this,t):a.type===6&&(d=new Q(o,this,t)),this._$AV.push(d),a=s[++c]}n!==a?.index&&(o=y.nextNode(),n++)}return y.currentNode=w,i}p(t){let e=0;for(let s of this._$AV)s!==void 0&&(s.strings!==void 0?(s._$AI(t,s,e),e+=s.strings.length-2):s._$AI(t[e])),e++}},R=class r{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,e,s,i){this.type=2,this._$AH=p,this._$AN=void 0,this._$AA=t,this._$AB=e,this._$AM=s,this.options=i,this._$Cv=i?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode,e=this._$AM;return e!==void 0&&t?.nodeType===11&&(t=e.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,e=this){t=S(this,t,e),N(t)?t===p||t==null||t===""?(this._$AH!==p&&this._$AR(),this._$AH=p):t!==this._$AH&&t!==x&&this._(t):t._$litType$!==void 0?this.$(t):t.nodeType!==void 0?this.T(t):zt(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==p&&N(this._$AH)?this._$AA.nextSibling.data=t:this.T(w.createTextNode(t)),this._$AH=t}$(t){let{values:e,_$litType$:s}=t,i=typeof s=="number"?this._$AC(t):(s.el===void 0&&(s.el=T.createElement(mt(s.h,s.h[0]),this.options)),s);if(this._$AH?._$AD===i)this._$AH.p(e);else{let o=new K(i,this),n=o.u(this.options);o.p(e),this.T(n),this._$AH=o}}_$AC(t){let e=ft.get(t.strings);return e===void 0&&ft.set(t.strings,e=new T(t)),e}k(t){X(this._$AH)||(this._$AH=[],this._$AR());let e=this._$AH,s,i=0;for(let o of t)i===e.length?e.push(s=new r(this.O(U()),this.O(U()),this,this.options)):s=e[i],s._$AI(o),i++;i<e.length&&(this._$AR(s&&s._$AB.nextSibling,i),e.length=i)}_$AR(t=this._$AA.nextSibling,e){for(this._$AP?.(!1,!0,e);t!==this._$AB;){let s=ct(t).nextSibling;ct(t).remove(),t=s}}setConnected(t){this._$AM===void 0&&(this._$Cv=t,this._$AP?.(t))}},E=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,e,s,i,o){this.type=1,this._$AH=p,this._$AN=void 0,this.element=t,this.name=e,this._$AM=i,this.options=o,s.length>2||s[0]!==""||s[1]!==""?(this._$AH=Array(s.length-1).fill(new String),this.strings=s):this._$AH=p}_$AI(t,e=this,s,i){let o=this.strings,n=!1;if(o===void 0)t=S(this,t,e,0),n=!N(t)||t!==this._$AH&&t!==x,n&&(this._$AH=t);else{let c=t,a,d;for(t=o[0],a=0;a<o.length-1;a++)d=S(this,c[s+a],e,a),d===x&&(d=this._$AH[a]),n||(n=!N(d)||d!==this._$AH[a]),d===p?t=p:t!==p&&(t+=(d??"")+o[a+1]),this._$AH[a]=d}n&&!i&&this.j(t)}j(t){t===p?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"")}},F=class extends E{constructor(){super(...arguments),this.type=3}j(t){this.element[this.name]=t===p?void 0:t}},J=class extends E{constructor(){super(...arguments),this.type=4}j(t){this.element.toggleAttribute(this.name,!!t&&t!==p)}},Y=class extends E{constructor(t,e,s,i,o){super(t,e,s,i,o),this.type=5}_$AI(t,e=this){if((t=S(this,t,e,0)??p)===x)return;let s=this._$AH,i=t===p&&s!==p||t.capture!==s.capture||t.once!==s.once||t.passive!==s.passive,o=t!==p&&(s===p||i);i&&this.element.removeEventListener(this.name,this,s),o&&this.element.addEventListener(this.name,this,t),this._$AH=t}handleEvent(t){typeof this._$AH=="function"?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t)}},Q=class{constructor(t,e,s){this.element=t,this.type=6,this._$AN=void 0,this._$AM=e,this.options=s}get _$AU(){return this._$AM._$AU}_$AI(t){S(this,t)}};var jt=k.litHtmlPolyfillSupport;jt?.(T,R),(k.litHtmlVersions??(k.litHtmlVersions=[])).push("3.3.2");var yt=(r,t,e)=>{let s=e?.renderBefore??t,i=s._$litPart$;if(i===void 0){let o=e?.renderBefore??null;s._$litPart$=i=new R(t.insertBefore(U(),o),o,void 0,e??{})}return i._$AI(r),i};var M=globalThis,$=class extends f{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){var e;let t=super.createRenderRoot();return(e=this.renderOptions).renderBefore??(e.renderBefore=t.firstChild),t}update(t){let e=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=yt(e,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return x}};$._$litElement$=!0,$.finalized=!0,M.litElementHydrateSupport?.({LitElement:$});var Bt=M.litElementPolyfillSupport;Bt?.({LitElement:$});(M.litElementVersions??(M.litElementVersions=[])).push("4.2.2");var wt={dishcare_dishwasher_program_intensiv_70:"Intensive 70\xB0C",dishcare_dishwasher_program_auto_2:"Auto 2",dishcare_dishwasher_program_eco_50:"Eco 50\xB0C",dishcare_dishwasher_program_pre_rinse:"Pre-rinse",dishcare_dishwasher_program_night_wash:"Night wash",dishcare_dishwasher_program_kurz_60:"Speed 60\xB0C",dishcare_dishwasher_program_machine_care:"Machine care",dishcare_dishwasher_program_quick_45:"Quick 45\xB0C",dishcare_dishwasher_program_intensiv_power:"Intensive power",dishcare_dishwasher_program_super_60:"Super 60\xB0C",dishcare_dishwasher_program_mixed_load:"Mixed load",dishcare_dishwasher_program_glas_40:"Glass 40\xB0C"};function xt(r){return!r||r==="unavailable"||r==="unknown"?r:wt[r]?wt[r]:r.replace(/^.*_program_/,"").replace(/_(\d+)$/," $1\xB0C").replace(/_/g," ").replace(/\b\w/g,t=>t.toUpperCase())}var H=class extends ${setConfig(t){if(!t.entity_prefix)throw new Error("entity_prefix is required");this.config=t}getCardSize(){return 4}_watchedEntities(){let t=this.config.entity_prefix;return[`switch.${t}_power`,`switch.${t}_vario_speed`,`switch.${t}_silence_on_demand`,`switch.${t}_extra_dry`,`switch.${t}_half_load`,`select.${t}_active_program`,`select.${t}_selected_program`,`sensor.${t}_door`,`sensor.${t}_operation_state`,`sensor.${t}_program_progress`,`sensor.${t}_program_finish_time`,`sensor.${t}_salt_nearly_empty`,`sensor.${t}_rinse_aid_nearly_empty`,`binary_sensor.${t}_remote_control`]}shouldUpdate(t){if(t.has("config"))return!0;if(!t.has("hass"))return!1;let e=t.get("hass");if(!e)return!0;for(let s of this._watchedEntities())if(e.states[s]!==this.hass.states[s])return!0;return!1}_entity(t,e){let s=`${t}.${this.config.entity_prefix}_${e}`;return this.hass?.states[s]}_state(t,e){return this._entity(t,e)?.state??"unavailable"}_attr(t,e,s){return this._entity(t,e)?.attributes?.[s]}_call(t,e,s,i={}){if(!this.hass)return;let o=`${t}.${this.config.entity_prefix}_${s}`;this.hass.callService(t,e,{entity_id:o,...i})}_finishTime(){let t=this._state("sensor","program_finish_time");return!t||t==="unavailable"||t==="0"?null:t}_isWarning(t,e){let s=this._state(t,e).toLowerCase();return s==="on"||s==="true"}_isDoorOpen(){return this._state("sensor","door").toLowerCase()==="open"}_operationState(){return this._state("sensor","operation_state").toLowerCase()}_isRunning(){let t=this._operationState();return t==="run"||t==="running"}_badge(){let t=this._operationState();return t==="run"||t==="running"?{text:"\u25CF RUNNING",cls:"badge-running"}:t==="finished"||t==="finish"?{text:"\u2713 FINISHED",cls:"badge-finished"}:t==="aborting"||t==="aborted"?{text:"\u26A0 ABORTED",cls:"badge-aborted"}:{text:t?t.toUpperCase():"IDLE",cls:"badge-idle"}}_progress(){let t=this._state("sensor","program_progress"),e=parseInt(t,10);return isNaN(e)?0:Math.min(100,Math.max(0,e))}_renderDishwasher(t){return v`
+      <svg class="bosch-dw ${t}" viewBox="0 0 80 110" width="72" height="100" aria-hidden="true">
         <defs>
           <linearGradient id="dw-door" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%"   stop-color="#2a3441"/>
@@ -217,7 +61,7 @@ class BoschDishwasherCard extends LitElement {
         <text x="40" y="16" text-anchor="middle"
               font-size="5" font-family="monospace"
               font-weight="bold" fill="#00b4d8"
-              class="display-text">${displayText}</text>
+              class="display-text">${t==="running"?"\u2022\u2022\u2022\u2022":t==="finished"?"DONE":t==="aborted"?"STOP":"----"}</text>
 
         <!-- program indicator dots -->
         <circle cx="60" cy="12" r="0.8" fill="#30363d"/>
@@ -230,88 +74,51 @@ class BoschDishwasherCard extends LitElement {
         <!-- handle (below control panel) -->
         <rect x="14" y="29" width="52" height="4" rx="2" fill="url(#dw-handle)"/>
       </svg>
-    `;
-  }
-
-  render() {
-    if (!this.hass || !this.config) return html``;
-
-    const name        = this.config.name ?? this.config.entity_prefix;
-    const running     = this._isRunning();
-    const badge       = this._badge();
-    const dwState     = running                          ? 'running'
-                      : badge.cls === 'badge-finished'   ? 'finished'
-                      : badge.cls === 'badge-aborted'    ? 'aborted'
-                      :                                    'idle';
-    const progress    = this._progress();
-    const finishTime  = this._finishTime();
-    const activeProgram   = this._state('select', 'active_program');
-    const selectedProgram = this._state('select', 'selected_program');
-    const _programKey = (activeProgram && activeProgram !== 'unavailable' && activeProgram !== 'unknown')
-      ? activeProgram
-      : selectedProgram;
-    const displayProgram = (!_programKey || _programKey === 'unavailable' || _programKey === 'unknown')
-      ? 'Detenido'
-      : programLabel(_programKey);
-    const doorOpen   = this._isDoorOpen();
-    const saltWarn   = this._isWarning('sensor', 'salt_nearly_empty');
-    const rinseWarn  = this._isWarning('sensor', 'rinse_aid_nearly_empty');
-    const remoteOn   = this._state('binary_sensor', 'remote_control') === 'on';
-
-    const powerOn          = this._state('switch', 'power') === 'on';
-    const turboOn          = this._state('switch', 'vario_speed') === 'on';
-    const silenceState     = this._state('switch', 'silence_on_demand');
-    const silenceOn        = silenceState === 'on';
-    const silenceAvailable = silenceState !== 'unavailable';
-    const extraDryOn       = this._state('switch', 'extra_dry') === 'on';
-    const halfLoadOn       = this._state('switch', 'half_load') === 'on';
-    const programOptions   = this._attr('select', 'selected_program', 'options') ?? [];
-
-    return html`
+    `}render(){if(!this.hass||!this.config)return v``;let t=this.config.name??this.config.entity_prefix,e=this._isRunning(),s=this._badge(),i=e?"running":s.cls==="badge-finished"?"finished":s.cls==="badge-aborted"?"aborted":"idle",o=this._progress(),n=this._finishTime(),c=this._state("select","active_program"),a=this._state("select","selected_program"),d=c&&c!=="unavailable"&&c!=="unknown"?c:a,h=!d||d==="unavailable"||d==="unknown"?"Detenido":xt(d),l=this._isDoorOpen(),u=this._isWarning("sensor","salt_nearly_empty"),_=this._isWarning("sensor","rinse_aid_nearly_empty"),A=this._state("binary_sensor","remote_control")==="on",tt=this._state("switch","power")==="on",vt=this._state("switch","vario_speed")==="on",et=this._state("switch","silence_on_demand"),At=et==="on",St=et!=="unavailable",Et=this._state("switch","extra_dry")==="on",Ct=this._state("switch","half_load")==="on",st=this._attr("select","selected_program","options")??[];return v`
       <ha-card>
         <div class="card-content">
 
           <!-- Header zone -->
           <div class="header">
             <div class="dw-illustration">
-              ${this._renderDishwasher(dwState)}
+              ${this._renderDishwasher(i)}
             </div>
             <div class="header-info">
               <div class="header-top">
-                <span class="card-name">${name}</span>
-                <span class="badge ${badge.cls}">${badge.text}</span>
+                <span class="card-name">${t}</span>
+                <span class="badge ${s.cls}">${s.text}</span>
               </div>
               <div class="program-line">
-                ${displayProgram}${finishTime ? html` · ${finishTime}` : ''}
+                ${h}${n?v` · ${n}`:""}
               </div>
               <div class="progress-bar">
-                <div class="progress-fill" style="width:${progress}%"></div>
+                <div class="progress-fill" style="width:${o}%"></div>
               </div>
-              <div class="progress-label">${progress}%</div>
+              <div class="progress-label">${o}%</div>
             </div>
           </div>
 
           <!-- Sensors grid -->
           <div class="sensors">
-            <div class="sensor ${doorOpen ? 'warn' : ''}">
+            <div class="sensor ${l?"warn":""}">
               <span class="sensor-icon">🚪</span>
               <span class="sensor-label">Puerta</span>
-              <span class="sensor-value">${doorOpen ? '⚠ Abierta' : 'Cerrada'}</span>
+              <span class="sensor-value">${l?"\u26A0 Abierta":"Cerrada"}</span>
             </div>
-            <div class="sensor ${saltWarn ? 'warn' : ''}">
+            <div class="sensor ${u?"warn":""}">
               <span class="sensor-icon">🧂</span>
               <span class="sensor-label">Sal</span>
-              <span class="sensor-value">${saltWarn ? '⚠ Baja' : 'OK'}</span>
+              <span class="sensor-value">${u?"\u26A0 Baja":"OK"}</span>
             </div>
-            <div class="sensor ${rinseWarn ? 'warn' : ''}">
+            <div class="sensor ${_?"warn":""}">
               <span class="sensor-icon">💧</span>
               <span class="sensor-label">Abrillantador</span>
-              <span class="sensor-value">${rinseWarn ? '⚠ Bajo' : 'OK'}</span>
+              <span class="sensor-value">${_?"\u26A0 Bajo":"OK"}</span>
             </div>
             <div class="sensor">
               <span class="sensor-icon">📡</span>
               <span class="sensor-label">Remoto</span>
-              <span class="sensor-value">${remoteOn ? 'ON' : 'OFF'}</span>
+              <span class="sensor-value">${A?"ON":"OFF"}</span>
             </div>
           </div>
 
@@ -320,45 +127,43 @@ class BoschDishwasherCard extends LitElement {
             <div class="controls-label">CONTROLES</div>
             <div class="controls-row">
               <button
-                class="ctrl-btn ${powerOn ? 'active' : ''}"
-                @click=${() => this._call('switch','toggle','power')}>
-                ⏻ ${powerOn ? 'ON' : 'OFF'}
+                class="ctrl-btn ${tt?"active":""}"
+                @click=${()=>this._call("switch","toggle","power")}>
+                ⏻ ${tt?"ON":"OFF"}
               </button>
               <select
                 class="ctrl-select"
-                .value=${selectedProgram}
-                @change=${(e) => this._call('select','select_option','selected_program',{ option: e.target.value })}>
-                ${programOptions.length === 0
-                  ? html`<option disabled>—</option>`
-                  : programOptions.map(opt => html`<option value="${opt}">${programLabel(opt)}</option>`)}
+                .value=${a}
+                @change=${L=>this._call("select","select_option","selected_program",{option:L.target.value})}>
+                ${st.length===0?v`<option disabled>—</option>`:st.map(L=>v`<option value="${L}">${xt(L)}</option>`)}
               </select>
               <button
                 class="ctrl-btn danger"
-                ?disabled=${!running}
-                @click=${() => this._call('button','press','stop_program')}>
+                ?disabled=${!e}
+                @click=${()=>this._call("button","press","stop_program")}>
                 ⏹ STOP
               </button>
             </div>
             <div class="controls-grid">
               <button
-                class="ctrl-btn ${turboOn ? 'active' : ''}"
-                @click=${() => this._call('switch','toggle','vario_speed')}>
+                class="ctrl-btn ${vt?"active":""}"
+                @click=${()=>this._call("switch","toggle","vario_speed")}>
                 ⚡ TURBO
               </button>
               <button
-                class="ctrl-btn ${silenceOn ? 'active' : ''}"
-                ?disabled=${!silenceAvailable}
-                @click=${() => this._call('switch','toggle','silence_on_demand')}>
+                class="ctrl-btn ${At?"active":""}"
+                ?disabled=${!St}
+                @click=${()=>this._call("switch","toggle","silence_on_demand")}>
                 🔇 SILENCIO
               </button>
               <button
-                class="ctrl-btn ${extraDryOn ? 'active' : ''}"
-                @click=${() => this._call('switch','toggle','extra_dry')}>
+                class="ctrl-btn ${Et?"active":""}"
+                @click=${()=>this._call("switch","toggle","extra_dry")}>
                 🌡 EXTRA SECO
               </button>
               <button
-                class="ctrl-btn ${halfLoadOn ? 'active' : ''}"
-                @click=${() => this._call('switch','toggle','half_load')}>
+                class="ctrl-btn ${Ct?"active":""}"
+                @click=${()=>this._call("switch","toggle","half_load")}>
                 ½ MEDIA CARGA
               </button>
             </div>
@@ -366,10 +171,7 @@ class BoschDishwasherCard extends LitElement {
 
         </div>
       </ha-card>
-    `;
-  }
-
-  static styles = css`
+    `}};j(H,"properties",{hass:{attribute:!1},config:{attribute:!1}}),j(H,"styles",W`
     ha-card {
       background: #0d1117;
       color: #e6edf3;
@@ -548,7 +350,29 @@ class BoschDishwasherCard extends LitElement {
       outline: none;
     }
     .ctrl-select:focus { border-color: #00b4d8; }
-  `;
-}
+  `);customElements.define("bosch-dishwasher-card",H);
+/*! Bundled license information:
 
-customElements.define('bosch-dishwasher-card', BoschDishwasherCard);
+@lit/reactive-element/css-tag.js:
+  (**
+   * @license
+   * Copyright 2019 Google LLC
+   * SPDX-License-Identifier: BSD-3-Clause
+   *)
+
+@lit/reactive-element/reactive-element.js:
+lit-html/lit-html.js:
+lit-element/lit-element.js:
+  (**
+   * @license
+   * Copyright 2017 Google LLC
+   * SPDX-License-Identifier: BSD-3-Clause
+   *)
+
+lit-html/is-server.js:
+  (**
+   * @license
+   * Copyright 2022 Google LLC
+   * SPDX-License-Identifier: BSD-3-Clause
+   *)
+*/

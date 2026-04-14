@@ -1,0 +1,16 @@
+{
+  "name": "bosch-dishwasher-card",
+  "version": "1.0.0",
+  "description": "Home Assistant Lovelace card for Bosch dishwashers via Home Connect",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/bosch-dishwasher-card.js --bundle --format=esm --target=es2020 --minify --outfile=bosch-dishwasher-card.js",
+    "build:dev": "esbuild src/bosch-dishwasher-card.js --bundle --format=esm --target=es2020 --sourcemap --outfile=bosch-dishwasher-card.js"
+  },
+  "dependencies": {
+    "lit": "^3.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
