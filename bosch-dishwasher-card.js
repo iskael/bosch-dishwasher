@@ -57,13 +57,13 @@ class BoschDishwasherCard extends LitElement {
     if (s === 'run' || s === 'running')      return { text: '● RUNNING',  cls: 'badge-running'  };
     if (s === 'finished' || s === 'finish')  return { text: '✓ FINISHED', cls: 'badge-finished' };
     if (s === 'aborting' || s === 'aborted') return { text: '⚠ ABORTED',  cls: 'badge-aborted'  };
-    return { text: 'IDLE', cls: 'badge-idle' };
+    return { text: s ? s.toUpperCase() : 'IDLE', cls: 'badge-idle' };
   }
 
   _progress() {
     const raw = this._state('sensor', 'program_progress');
     const n = parseInt(raw, 10);
-    return isNaN(n) ? 0 : n;
+    return isNaN(n) ? 0 : Math.min(100, Math.max(0, n));
   }
 
   _renderSprayArm() {
@@ -193,7 +193,7 @@ class BoschDishwasherCard extends LitElement {
 
     /* Spray arm SVG */
     .spray-arm .arm-group {
-      transform-origin: 24px 24px;
+      transform-origin: 50% 50%;
       animation: spin 2s linear infinite;
     }
     .nozzle-left  { animation: spray 1s ease-in-out infinite; }
