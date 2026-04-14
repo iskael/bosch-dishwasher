@@ -1,5 +1,7 @@
 {
-  "name": "Bosch Dishwasher Card",
-  "filename": "bosch-dishwasher-card.js",
-  "render_readme": true
+  "name": "Bosch Dishwasher",
+  "content_in_root": false,
+  "render_readme": true,
+  "zip_release": false,
+  "homeassistant": "2024.11.0"
 }

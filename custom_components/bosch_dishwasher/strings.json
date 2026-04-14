@@ -1,0 +1,113 @@
+{
+  "application_credentials": {
+    "description": "Create your Home Connect developer application at [the Home Connect Developer Portal]({applications_url}) and paste the **Client ID** and **Client Secret** here. The application's redirect URI must be set to `{redirect_url}`."
+  },
+  "config": {
+    "abort": {
+      "already_configured": "This Home Connect account is already configured.",
+      "missing_configuration": "[%key:common::config_flow::abort::oauth2_missing_configuration%]",
+      "no_url_available": "[%key:common::config_flow::abort::oauth2_no_url_available%]",
+      "oauth_error": "[%key:common::config_flow::abort::oauth2_error%]",
+      "oauth_failed": "[%key:common::config_flow::abort::oauth2_failed%]",
+      "oauth_implementation_unavailable": "[%key:common::config_flow::abort::oauth2_implementation_unavailable%]",
+      "oauth_timeout": "[%key:common::config_flow::abort::oauth2_timeout%]",
+      "oauth_unauthorized": "[%key:common::config_flow::abort::oauth2_unauthorized%]",
+      "reauth_successful": "[%key:common::config_flow::abort::reauth_successful%]",
+      "wrong_account": "Reauthenticate using the same Home Connect account."
+    },
+    "create_entry": {
+      "default": "Successfully authenticated with Home Connect."
+    },
+    "step": {
+      "reauth_confirm": {
+        "description": "The Bosch Dishwasher integration needs to re-authenticate your Home Connect account.",
+        "title": "Reauthenticate Bosch Dishwasher"
+      }
+    }
+  },
+  "exceptions": {
+    "set_option": {"message": "Could not set option: {error}"},
+    "set_setting": {"message": "Could not change setting: {error}"},
+    "set_power": {"message": "Could not change power state: {error}"},
+    "select_program": {"message": "Could not select program: {error}"},
+    "press_command": {"message": "Could not send command: {error}"},
+    "stop_program": {"message": "Could not stop program: {error}"},
+    "unknown_program": {"message": "Unknown dishwasher program: {program}"}
+  },
+  "entity": {
+    "binary_sensor": {
+      "remote_control": {"name": "Remote control"},
+      "remote_control_start_allowed": {"name": "Remote start"},
+      "local_control": {"name": "Local control"},
+      "salt_nearly_empty": {"name": "Salt nearly empty"},
+      "rinse_aid_nearly_empty": {"name": "Rinse aid nearly empty"},
+      "connected": {"name": "Connected"}
+    },
+    "button": {
+      "open_door": {"name": "Open door"},
+      "partly_open_door": {"name": "Partly open door"},
+      "pause_program": {"name": "Pause program"},
+      "resume_program": {"name": "Resume program"},
+      "stop_program": {"name": "Stop program"}
+    },
+    "select": {
+      "active_program": {"name": "Active program"},
+      "selected_program": {"name": "Selected program"}
+    },
+    "sensor": {
+      "operation_state": {
+        "name": "Operation state",
+        "state": {
+          "inactive": "Inactive",
+          "ready": "Ready",
+          "delayed_start": "Delayed start",
+          "run": "Running",
+          "pause": "Paused",
+          "action_required": "Action required",
+          "finished": "Finished",
+          "error": "Error",
+          "aborting": "Aborting"
+        }
+      },
+      "door_state": {
+        "name": "Door",
+        "state": {
+          "open": "Open",
+          "closed": "Closed",
+          "locked": "Locked"
+        }
+      },
+      "program_progress": {"name": "Program progress"},
+      "remaining_program_time": {"name": "Remaining time"},
+      "program_finished": {
+        "name": "Program finished",
+        "state": {
+          "off": "Off",
+          "present": "Present",
+          "confirmed": "Confirmed"
+        }
+      },
+      "program_aborted": {
+        "name": "Program aborted",
+        "state": {
+          "off": "Off",
+          "present": "Present",
+          "confirmed": "Confirmed"
+        }
+      }
+    },
+    "switch": {
+      "power": {"name": "Power"},
+      "child_lock": {"name": "Child lock"},
+      "intensiv_zone": {"name": "Intensiv zone"},
+      "brilliance_dry": {"name": "Brilliance dry"},
+      "vario_speed_plus": {"name": "VarioSpeed+"},
+      "silence_on_demand": {"name": "Silence on demand"},
+      "half_load": {"name": "Half load"},
+      "extra_dry": {"name": "Extra dry"},
+      "hygiene_plus": {"name": "Hygiene+"},
+      "eco_dry": {"name": "Eco dry"},
+      "zeolite_dry": {"name": "Zeolite dry"}
+    }
+  }
+}
