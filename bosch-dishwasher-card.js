@@ -1,5 +1,35 @@
 import { LitElement, html, css } from 'https://unpkg.com/lit?module';
 
+// Maps Home Connect internal program keys to human-readable labels.
+// Keys from the Bosch integration use the dishcare_dishwasher_program_* namespace.
+const PROGRAM_NAMES = {
+  dishcare_dishwasher_program_intensiv_70:   'Intensive 70°C',
+  dishcare_dishwasher_program_auto_2:        'Auto 2',
+  dishcare_dishwasher_program_eco_50:        'Eco 50°C',
+  dishcare_dishwasher_program_pre_rinse:     'Pre-rinse',
+  dishcare_dishwasher_program_night_wash:    'Night wash',
+  dishcare_dishwasher_program_kurz_60:       'Speed 60°C',
+  dishcare_dishwasher_program_machine_care:  'Machine care',
+  dishcare_dishwasher_program_quick_45:      'Quick 45°C',
+  dishcare_dishwasher_program_intensiv_power:'Intensive power',
+  dishcare_dishwasher_program_super_60:      'Super 60°C',
+  dishcare_dishwasher_program_mixed_load:    'Mixed load',
+  dishcare_dishwasher_program_glas_40:       'Glass 40°C',
+};
+
+// Returns a human-readable label for a program key.
+// Falls back to a formatted version of the key for unknown programs.
+function programLabel(key) {
+  if (!key || key === 'unavailable' || key === 'unknown') return key;
+  if (PROGRAM_NAMES[key]) return PROGRAM_NAMES[key];
+  // Fallback: strip common prefix, format remainder
+  return key
+    .replace(/^.*_program_/, '')       // strip dishcare_..._program_
+    .replace(/_(\d+)$/, ' $1°C')       // trailing number → " 70°C"
+    .replace(/_/g, ' ')                // underscores → spaces
+    .replace(/\b\w/g, c => c.toUpperCase()); // Title Case
+}
+
 class BoschDishwasherCard extends LitElement {
   static properties = {
     hass: { attribute: false },
@@ -101,7 +131,7 @@ class BoschDishwasherCard extends LitElement {
     const finishTime  = this._finishTime();
     const activeProgram   = this._state('select', 'active_program');
     const selectedProgram = this._state('select', 'selected_program');
-    const displayProgram  = (activeProgram !== 'unavailable' ? activeProgram : selectedProgram);
+    const displayProgram  = programLabel(activeProgram !== 'unavailable' ? activeProgram : selectedProgram);
     const doorOpen   = this._isDoorOpen();
     const saltWarn   = this._isWarning('sensor', 'salt_nearly_empty');
     const rinseWarn  = this._isWarning('sensor', 'rinse_aid_nearly_empty');
@@ -177,7 +207,7 @@ class BoschDishwasherCard extends LitElement {
                 @change=${(e) => this._call('select','select_option','selected_program',{ option: e.target.value })}>
                 ${programOptions.length === 0
                   ? html`<option disabled>—</option>`
-                  : programOptions.map(opt => html`<option value="${opt}">${opt}</option>`)}
+                  : programOptions.map(opt => html`<option value="${opt}">${programLabel(opt)}</option>`)}
               </select>
               <button
                 class="ctrl-btn danger"
