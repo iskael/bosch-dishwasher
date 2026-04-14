@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Bosch Dishwasher Card — Dev Harness</title>
+  <style>
+    body { background: #1a1a2e; display: flex; gap: 20px; padding: 20px; flex-wrap: wrap; }
+    .scenario { display: flex; flex-direction: column; gap: 6px; }
+    .scenario label { color: #8b949e; font: 11px/1 monospace; }
+  </style>
+</head>
+<body>
+
+<!-- Scenario buttons to switch mock state -->
+<div style="position:fixed;top:10px;right:10px;display:flex;flex-direction:column;gap:6px;z-index:100;">
+  <button onclick="setState('running')">▶ Running</button>
+  <button onclick="setState('idle')">⏸ Idle</button>
+  <button onclick="setState('finished')">✓ Finished</button>
+  <button onclick="setState('aborted')">⚠ Aborted</button>
+  <button onclick="setState('warnings')">⚠ Warnings</button>
+</div>
+
+<div class="scenario">
+  <label>CURRENT STATE</label>
+  <bosch-dishwasher-card id="card"></bosch-dishwasher-card>
+</div>
+
+<script type="module">
+  import '../bosch-dishwasher-card.js';
+
+  const BASE_STATES = {
+    'switch.lavavajillas_power':             { state: 'on',      attributes: {} },
+    'switch.lavavajillas_silence_on_demand': { state: 'off',     attributes: {} },
+    'switch.lavavajillas_vario_speed':       { state: 'off',     attributes: {} },
+    'select.lavavajillas_active_program':    { state: 'Eco 50°', attributes: {} },
+    'select.lavavajillas_selected_program':  {
+      state: 'Eco 50°',
+      attributes: { options: ['Auto 45-65°', 'Eco 50°', 'Intensivo 70°', 'Rápido 45°', 'Pre-lavado'] }
+    },
+    'button.lavavajillas_stop_program':      { state: 'unknown', attributes: {} },
+    'sensor.lavavajillas_door':              { state: 'Closed',  attributes: {} },
+    'sensor.lavavajillas_operation_state':   { state: 'Run',     attributes: {} },
+    'sensor.lavavajillas_program_aborted':   { state: 'false',   attributes: {} },
+    'sensor.lavavajillas_program_finish_time': { state: '42 min', attributes: {} },
+    'sensor.lavavajillas_program_finished':  { state: 'false',   attributes: {} },
+    'sensor.lavavajillas_program_progress':  { state: '65',      attributes: {} },
+    'binary_sensor.lavavajillas_remote_control': { state: 'on', attributes: {} },
+    'binary_sensor.lavavajillas_remote_start':   { state: 'off', attributes: {} },
+    'sensor.lavavajillas_rinse_aid_nearly_empty': { state: 'off', attributes: {} },
+    'sensor.lavavajillas_salt_nearly_empty': { state: 'off',     attributes: {} },
+  };
+
+  const SCENARIOS = {
+    running:  { 'sensor.lavavajillas_operation_state': { state: 'Run' },    'sensor.lavavajillas_program_progress': { state: '65' } },
+    idle:     { 'sensor.lavavajillas_operation_state': { state: 'Ready' },  'sensor.lavavajillas_program_progress': { state: '0'  }, 'sensor.lavavajillas_program_finish_time': { state: '0' } },
+    finished: { 'sensor.lavavajillas_operation_state': { state: 'Finished' }, 'sensor.lavavajillas_program_progress': { state: '100' } },
+    aborted:  { 'sensor.lavavajillas_operation_state': { state: 'Aborting' }, 'sensor.lavavajillas_program_progress': { state: '30' } },
+    warnings: {
+      'sensor.lavavajillas_operation_state':       { state: 'Run' },
+      'sensor.lavavajillas_salt_nearly_empty':     { state: 'on' },
+      'sensor.lavavajillas_rinse_aid_nearly_empty':{ state: 'on' },
+      'sensor.lavavajillas_door':                  { state: 'Open' },
+    },
+  };
+
+  function makeHass(overrides = {}) {
+    const states = {};
+    for (const [id, val] of Object.entries(BASE_STATES)) {
+      states[id] = { ...val, attributes: { ...val.attributes } };
+    }
+    for (const [id, patch] of Object.entries(overrides)) {
+      states[id] = { ...(states[id] || {}), attributes: {}, ...patch };
+    }
+    return {
+      states,
+      callService(domain, service, data) {
+        console.log('callService:', domain, service, data);
+      }
+    };
+  }
+
+  const card = document.getElementById('card');
+  card.setConfig({ entity_prefix: 'lavavajillas', name: 'Lavavajillas' });
+  card.hass = makeHass();
+
+  window.setState = (scenario) => {
+    card.hass = makeHass(SCENARIOS[scenario] || {});
+  };
+</script>
+</body>
+</html>
