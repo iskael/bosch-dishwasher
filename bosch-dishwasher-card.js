@@ -131,11 +131,12 @@ class BoschDishwasherCard extends LitElement {
     const finishTime  = this._finishTime();
     const activeProgram   = this._state('select', 'active_program');
     const selectedProgram = this._state('select', 'selected_program');
-    const displayProgram  = programLabel(
-      (activeProgram && activeProgram !== 'unavailable' && activeProgram !== 'unknown')
-        ? activeProgram
-        : selectedProgram
-    );
+    const _programKey = (activeProgram && activeProgram !== 'unavailable' && activeProgram !== 'unknown')
+      ? activeProgram
+      : selectedProgram;
+    const displayProgram = (!_programKey || _programKey === 'unavailable' || _programKey === 'unknown')
+      ? 'Detenido'
+      : programLabel(_programKey);
     const doorOpen   = this._isDoorOpen();
     const saltWarn   = this._isWarning('sensor', 'salt_nearly_empty');
     const rinseWarn  = this._isWarning('sensor', 'rinse_aid_nearly_empty');
