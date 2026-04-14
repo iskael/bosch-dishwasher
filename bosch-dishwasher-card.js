@@ -104,6 +104,11 @@ class BoschDishwasherCard extends LitElement {
     const rinseWarn  = this._isWarning('sensor', 'rinse_aid_nearly_empty');
     const remoteOn   = this._state('binary_sensor', 'remote_control') === 'on';
 
+    const powerOn        = this._state('switch', 'power') === 'on';
+    const turboOn        = this._state('switch', 'vario_speed') === 'on';
+    const silenceOn      = this._state('switch', 'silence_on_demand') === 'on';
+    const programOptions = this._attr('select', 'selected_program', 'options') ?? [];
+
     return html`
       <ha-card>
         <div class="card-content">
@@ -159,16 +164,17 @@ class BoschDishwasherCard extends LitElement {
             <div class="controls-label">CONTROLES</div>
             <div class="controls-row">
               <button
-                class="ctrl-btn ${this._state('switch','power') === 'on' ? 'active' : ''}"
+                class="ctrl-btn ${powerOn ? 'active' : ''}"
                 @click=${() => this._call('switch','toggle','power')}>
-                ⏻ ${this._state('switch','power') === 'on' ? 'ON' : 'OFF'}
+                ⏻ ${powerOn ? 'ON' : 'OFF'}
               </button>
               <select
                 class="ctrl-select"
+                .value=${this._state('select', 'selected_program')}
                 @change=${(e) => this._call('select','select_option','selected_program',{ option: e.target.value })}>
-                ${(this._attr('select','selected_program','options') ?? []).map(opt => html`
-                  <option value=${opt} ?selected=${opt === this._state('select','selected_program')}>${opt}</option>
-                `)}
+                ${programOptions.length === 0
+                  ? html`<option disabled>—</option>`
+                  : programOptions.map(opt => html`<option value="${opt}" ?selected=${opt === this._state('select','selected_program')}>${opt}</option>`)}
               </select>
               <button
                 class="ctrl-btn danger"
@@ -179,12 +185,12 @@ class BoschDishwasherCard extends LitElement {
             </div>
             <div class="controls-row">
               <button
-                class="ctrl-btn ${this._state('switch','vario_speed') === 'on' ? 'active' : ''}"
+                class="ctrl-btn ${turboOn ? 'active' : ''}"
                 @click=${() => this._call('switch','toggle','vario_speed')}>
                 ⚡ TURBO
               </button>
               <button
-                class="ctrl-btn ${this._state('switch','silence_on_demand') === 'on' ? 'active' : ''}"
+                class="ctrl-btn ${silenceOn ? 'active' : ''}"
                 @click=${() => this._call('switch','toggle','silence_on_demand')}>
                 🔇 SILENCIO
               </button>
