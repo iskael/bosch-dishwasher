@@ -6,6 +6,8 @@ This integration **does not depend on** Home Assistant's core `home_connect` com
 
 ![preview](https://raw.githubusercontent.com/iskael/bosch-dishwasher/main/docs/images/card-running.png)
 
+![card editor with live preview](https://raw.githubusercontent.com/iskael/bosch-dishwasher/main/docs/images/card-editor-preview.png)
+
 ## What you get
 
 - A `bosch_dishwasher` integration that discovers every dishwasher on your Home Connect account and creates one device per appliance
