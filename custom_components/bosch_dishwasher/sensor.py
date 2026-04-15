@@ -147,7 +147,15 @@ class HomeConnectSensor(HomeConnectEntity, SensorEntity):
 
         event = self.appliance.events.get(event_key)
         if event is None:
-            self._attr_native_value = None
+            # ENUM presence sensors default to "off" when no event has arrived yet.
+            if (
+                desc.device_class is SensorDeviceClass.ENUM
+                and desc.options is not None
+                and "off" in desc.options
+            ):
+                self._attr_native_value = "off"
+            else:
+                self._attr_native_value = None
             return
 
         if desc.device_class is SensorDeviceClass.TIMESTAMP:

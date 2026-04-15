@@ -1,6 +1,6 @@
 {
   "name": "bosch-dishwasher-card",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "Home Assistant Lovelace card for Bosch dishwashers via Home Connect",
   "private": true,
   "scripts": {

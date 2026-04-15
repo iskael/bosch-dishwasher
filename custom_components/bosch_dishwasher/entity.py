@@ -37,8 +37,12 @@ class HomeConnectEntity(CoordinatorEntity[HomeConnectApplianceCoordinator]):
         self.appliance = coordinator.data
         self.entity_description = desc
         self._attr_unique_id = f"{appliance_ha_id}-{desc.key}"
+        appliance_info = coordinator.data.info
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, appliance_ha_id)},
+            name=appliance_info.name,
+            model=appliance_info.vib,
+            manufacturer=appliance_info.brand,
         )
         self.update_native_value()
 

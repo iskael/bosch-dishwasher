@@ -148,6 +148,35 @@ class HomeConnectApplianceCoordinator(
             if program.key and program.key != ProgramKey.UNKNOWN
         ]
 
+        # Store active/selected program keys in the events dict so select entities
+        # can read them at initial load (before any SSE event arrives).
+        if all_programs.active and all_programs.active.key:
+            active_key = EventKey.BSH_COMMON_ROOT_ACTIVE_PROGRAM
+            self.data.events[active_key] = Event(
+                key=active_key,
+                raw_key=active_key.value,
+                timestamp=0,
+                level="",
+                handling="",
+                value=all_programs.active.key.value,
+                name=None,
+                display_value=None,
+                unit=None,
+            )
+        if all_programs.selected and all_programs.selected.key:
+            selected_key = EventKey.BSH_COMMON_ROOT_SELECTED_PROGRAM
+            self.data.events[selected_key] = Event(
+                key=selected_key,
+                raw_key=selected_key.value,
+                timestamp=0,
+                level="",
+                handling="",
+                value=all_programs.selected.key.value,
+                name=None,
+                display_value=None,
+                unit=None,
+            )
+
         active_or_selected = all_programs.active or all_programs.selected
         if active_or_selected and active_or_selected.key:
             self.data.options = await self._fetch_program_options(
