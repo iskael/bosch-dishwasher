@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 import logging
 from typing import Any
 
@@ -39,6 +39,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+from homeassistant.util import dt as dt_util
 
 from .const import (
     API_DEFAULT_RETRY_AFTER,
@@ -52,12 +53,27 @@ from .const import (
 # Event keys whose values become meaningless once a program is no longer
 # running. Home Connect does NOT push new values for these when the cycle
 # ends — it just flips OperationState — so we clear them ourselves.
+#
+# NOTE: StartInRelative is deliberately NOT in this list. It arrives as a
+# NOTIFY event BEFORE the OperationState transition to DelayedStart, so
+# clearing on Ready (which the op_state still reports at that moment)
+# would race-wipe the value right after we stored it.
 _PROGRAM_RUNTIME_EVENT_KEYS: tuple[EventKey, ...] = (
     EventKey.BSH_COMMON_OPTION_PROGRAM_PROGRESS,
     EventKey.BSH_COMMON_OPTION_REMAINING_PROGRAM_TIME,
     EventKey.BSH_COMMON_OPTION_ESTIMATED_TOTAL_PROGRAM_TIME,
     EventKey.BSH_COMMON_OPTION_ELAPSED_PROGRAM_TIME,
-    EventKey.BSH_COMMON_OPTION_START_IN_RELATIVE,
+)
+
+# Relative-time option keys that must be converted to absolute timestamps
+# at event receive time. If we recomputed utcnow() + delta on every
+# coordinator update, the absolute time would drift forward by the
+# update-tick interval, misleading the user about cycle end / delayed start.
+_RELATIVE_TIME_EVENT_KEYS: frozenset[EventKey] = frozenset(
+    {
+        EventKey.BSH_COMMON_OPTION_REMAINING_PROGRAM_TIME,
+        EventKey.BSH_COMMON_OPTION_START_IN_RELATIVE,
+    }
 )
 
 _IDLE_OPERATION_STATES: frozenset[str] = frozenset(
@@ -87,6 +103,10 @@ class HomeConnectApplianceData:
     commands: set[CommandKey] = field(default_factory=set)
     programs: list[EnumerateProgram] = field(default_factory=list)
     options: dict[OptionKey, ProgramDefinitionOption] = field(default_factory=dict)
+    # Absolute timestamps computed at event-receive time for relative-time
+    # event keys (see _RELATIVE_TIME_EVENT_KEYS). Keeps TIMESTAMP-class
+    # sensors stable across coordinator updates.
+    computed_timestamps: dict[EventKey, datetime] = field(default_factory=dict)
 
 
 class HomeConnectApplianceCoordinator(
@@ -122,6 +142,31 @@ class HomeConnectApplianceCoordinator(
     ) -> CALLBACK_TYPE:
         """Listen for updates, optionally filtered by EventKey context."""
         return super().async_add_listener(update_callback, context)
+
+    def _record_computed_timestamp(self, event_key: EventKey, value: Any) -> None:
+        """Freeze a relative-seconds value into an absolute timestamp.
+
+        Home Connect emits BSH.Common.Option.RemainingProgramTime and
+        BSH.Common.Option.StartInRelative as seconds-from-now. We resolve
+        them to absolute datetimes at the moment the event arrives so the
+        sensor state doesn't drift forward on every subsequent update.
+        """
+        if event_key not in _RELATIVE_TIME_EVENT_KEYS:
+            return
+        if value in (None, 0, "0"):
+            self.data.computed_timestamps.pop(event_key, None)
+            return
+        try:
+            seconds = int(value)
+        except (TypeError, ValueError):
+            self.data.computed_timestamps.pop(event_key, None)
+            return
+        if seconds <= 0:
+            self.data.computed_timestamps.pop(event_key, None)
+            return
+        self.data.computed_timestamps[event_key] = dt_util.utcnow() + timedelta(
+            seconds=seconds
+        )
 
     @callback
     def _async_dispatch_event_keys(self, keys: set[EventKey]) -> None:
@@ -218,6 +263,7 @@ class HomeConnectApplianceCoordinator(
                     display_value=option.display_value,
                     unit=option.unit,
                 )
+                self._record_computed_timestamp(event_key, option.value)
         else:
             self.data.options = {}
 
@@ -293,6 +339,7 @@ class HomeConnectApplianceCoordinator(
                 if event_key is EventKey.UNKNOWN:
                     continue
                 data.events[event_key] = event
+                self._record_computed_timestamp(event_key, event.value)
                 touched.add(event_key)
                 if event_key in (
                     EventKey.BSH_COMMON_ROOT_ACTIVE_PROGRAM,
@@ -307,6 +354,7 @@ class HomeConnectApplianceCoordinator(
                 if event_key is EventKey.UNKNOWN:
                     continue
                 data.events[event_key] = event
+                self._record_computed_timestamp(event_key, event.value)
                 touched.add(event_key)
 
         self._clear_stale_runtime_events(touched)
@@ -331,6 +379,7 @@ class HomeConnectApplianceCoordinator(
         for stale_key in _PROGRAM_RUNTIME_EVENT_KEYS:
             if self.data.events.pop(stale_key, None) is not None:
                 touched.add(stale_key)
+            self.data.computed_timestamps.pop(stale_key, None)
 
     @staticmethod
     def _safe_items(payload: ArrayOfEvents | None) -> list[Event]:

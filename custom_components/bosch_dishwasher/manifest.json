@@ -17,5 +17,5 @@
   "loggers": ["aiohomeconnect"],
   "quality_scale": "bronze",
   "requirements": ["aiohomeconnect==0.36.0"],
-  "version": "0.1.8"
+  "version": "0.1.9"
 }

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 
 from aiohomeconnect.model import EventKey, StatusKey
 
@@ -16,13 +15,16 @@ from homeassistant.components.sensor import (
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.util import dt as dt_util
 
 from .common import setup_home_connect_entry
 from .const import (
     BSH_EVENT_STATE_CONFIRMED,
     BSH_EVENT_STATE_OFF,
     BSH_EVENT_STATE_PRESENT,
+    BSH_OPERATION_STATE_ACTION_REQUIRED,
+    BSH_OPERATION_STATE_DELAYED_START,
+    BSH_OPERATION_STATE_PAUSE,
+    BSH_OPERATION_STATE_RUN,
 )
 from .coordinator import (
     BoschDishwasherConfigEntry,
@@ -128,9 +130,8 @@ class HomeConnectSensor(HomeConnectEntity, SensorEntity):
         key = desc.key
 
         if desc.appliance_status:
-            try:
-                status_key = StatusKey(key)
-            except ValueError:
+            status_key = StatusKey(key)
+            if status_key is StatusKey.UNKNOWN:
                 self._attr_native_value = None
                 return
             status = self.appliance.status.get(status_key)
@@ -139,10 +140,31 @@ class HomeConnectSensor(HomeConnectEntity, SensorEntity):
             )
             return
 
-        try:
-            event_key = EventKey(key)
-        except ValueError:
+        event_key = EventKey(key)
+        if event_key is EventKey.UNKNOWN:
             self._attr_native_value = None
+            return
+
+        # TIMESTAMP-class events (RemainingProgramTime, StartInRelative) are
+        # gated on the current operation state and read their absolute value
+        # from the coordinator's pre-computed timestamps so they don't drift
+        # forward on every update.
+        if desc.device_class is SensorDeviceClass.TIMESTAMP:
+            op_state = self._op_state()
+            if event_key is EventKey.BSH_COMMON_OPTION_START_IN_RELATIVE:
+                if op_state != BSH_OPERATION_STATE_DELAYED_START:
+                    self._attr_native_value = None
+                    return
+            elif event_key is EventKey.BSH_COMMON_OPTION_REMAINING_PROGRAM_TIME:
+                if op_state not in (
+                    BSH_OPERATION_STATE_RUN,
+                    BSH_OPERATION_STATE_PAUSE,
+                    BSH_OPERATION_STATE_ACTION_REQUIRED,
+                    BSH_OPERATION_STATE_DELAYED_START,
+                ):
+                    self._attr_native_value = None
+                    return
+            self._attr_native_value = self.appliance.computed_timestamps.get(event_key)
             return
 
         event = self.appliance.events.get(event_key)
@@ -158,24 +180,16 @@ class HomeConnectSensor(HomeConnectEntity, SensorEntity):
                 self._attr_native_value = None
             return
 
-        if desc.device_class is SensorDeviceClass.TIMESTAMP:
-            seconds = event.value
-            if seconds in (None, 0, "0"):
-                self._attr_native_value = None
-                return
-            try:
-                self._attr_native_value = dt_util.utcnow() + timedelta(
-                    seconds=int(seconds)
-                )
-            except (TypeError, ValueError):
-                self._attr_native_value = None
-            return
-
         if desc.device_class is SensorDeviceClass.ENUM and isinstance(event.value, str):
             self._attr_native_value = self._presence_from_bsh(event.value)
             return
 
         self._attr_native_value = event.value
+
+    def _op_state(self) -> str | None:
+        """Return the current raw OperationState value (e.g. the full BSH enum)."""
+        op = self.appliance.status.get(StatusKey.BSH_COMMON_OPERATION_STATE)
+        return op.value if op and isinstance(op.value, str) else None
 
     @staticmethod
     def _enum_from_bsh(raw: str | None) -> str | None:

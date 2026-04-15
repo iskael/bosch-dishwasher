@@ -38,7 +38,7 @@ _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
 _LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "0.1.8"
+_CARD_VERSION = "0.1.9"
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
