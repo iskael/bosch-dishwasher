@@ -18,6 +18,7 @@ from homeassistant.helpers.config_entry_oauth2_flow import (
     OAuth2Session,
     async_get_config_entry_implementation,
 )
+from homeassistant.loader import async_get_integration
 
 from .api import AsyncConfigEntryAuth
 from .const import CARD_URL, DOMAIN, PLATFORMS
@@ -29,6 +30,7 @@ from .coordinator import (
 _LOGGER = logging.getLogger(__name__)
 
 _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
+_LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -127,8 +129,45 @@ async def _async_register_frontend_card(hass: HomeAssistant) -> None:
         _LOGGER.debug("Static path for card already registered: %s", err)
 
     hass.data[_CARD_REGISTERED_KEY] = True
-    _LOGGER.info(
-        "Bosch Dishwasher card available at %s — add it as a Lovelace resource "
-        "(JavaScript module) if you want to use the bundled card",
-        CARD_URL,
-    )
+
+    await _async_register_lovelace_resource(hass)
+
+
+async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
+    """Auto-add the card as a Lovelace resource so users don't have to."""
+    if hass.data.get(_LOVELACE_RESOURCE_KEY):
+        return
+    hass.data[_LOVELACE_RESOURCE_KEY] = True
+
+    try:
+        integration = await async_get_integration(hass, "lovelace")
+    except Exception:  # noqa: BLE001
+        _LOGGER.debug("Lovelace integration not available; skipping resource registration")
+        return
+
+    try:
+        # HA ≥ 2024.x stores resources in lovelace.resources (a StorageCollection)
+        resources = hass.data.get("lovelace", {}).get("resources")
+        if resources is None:
+            _LOGGER.debug("Lovelace resource store not found; add %s manually", CARD_URL)
+            return
+
+        await resources.async_load()
+        existing = [r for r in resources.async_items() if CARD_URL in r.get("url", "")]
+        if existing:
+            _LOGGER.debug("Lovelace resource %s already registered", CARD_URL)
+            return
+
+        integration_version = "2.0.0"
+        await resources.async_create_item(
+            {"res_type": "module", "url": f"{CARD_URL}?v={integration_version}"}
+        )
+        _LOGGER.info("Bosch Dishwasher card registered as Lovelace resource at %s", CARD_URL)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning(
+            "Could not auto-register Lovelace resource for the Bosch Dishwasher card "
+            "(%s). Add it manually: URL=%s, Type=JavaScript module. Error: %s",
+            CARD_URL,
+            CARD_URL,
+            err,
+        )
