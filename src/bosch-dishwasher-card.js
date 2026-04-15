@@ -36,6 +36,7 @@ const I18N = {
     sensors_title: 'Sensors',
     controls_title: 'Controls',
     show_all: 'Show all',
+    select_device_hint: 'Open the editor and pick a Bosch dishwasher device to start.',
   },
   es: {
     controls: 'CONTROLES',
@@ -71,6 +72,7 @@ const I18N = {
     sensors_title: 'Sensores',
     controls_title: 'Controles',
     show_all: 'Mostrar todo',
+    select_device_hint: 'Abre el editor y elige un lavavajillas Bosch para empezar.',
   },
 };
 
@@ -160,9 +162,8 @@ class BoschDishwasherCard extends LitElement {
   };
 
   setConfig(config) {
-    if (!config.device) {
-      throw new Error('A `device` (Bosch dishwasher) is required. Remove any `entity_prefix` and use the device picker in the card editor.');
-    }
+    // Accept empty device so the card picker can render a live preview
+    // before the user selects one. render() shows a placeholder in that case.
     this.config = {
       sensors:  DEFAULT_SENSORS,
       controls: DEFAULT_CONTROLS,
@@ -170,10 +171,19 @@ class BoschDishwasherCard extends LitElement {
     };
   }
 
-  static getStubConfig() {
+  static getStubConfig(hass) {
+    let device = '';
+    if (hass?.entities) {
+      for (const entity of Object.values(hass.entities)) {
+        if (entity.platform === 'bosch_dishwasher' && entity.device_id) {
+          device = entity.device_id;
+          break;
+        }
+      }
+    }
     return {
       type: 'custom:bosch-dishwasher-card',
-      device: '',
+      device,
       sensors:  DEFAULT_SENSORS,
       controls: DEFAULT_CONTROLS,
     };
@@ -458,6 +468,18 @@ class BoschDishwasherCard extends LitElement {
   render() {
     if (!this.hass || !this.config) return html``;
 
+    if (!this.config.device) {
+      return html`
+        <ha-card>
+          <div class="empty-state">
+            <div class="empty-icon">🫧</div>
+            <div class="empty-title">Bosch Dishwasher</div>
+            <div class="empty-hint">${this._t('select_device_hint')}</div>
+          </div>
+        </ha-card>
+      `;
+    }
+
     const deviceName =
       this.hass.devices?.[this.config.device]?.name_by_user
       ?? this.hass.devices?.[this.config.device]?.name
@@ -615,6 +637,13 @@ class BoschDishwasherCard extends LitElement {
       color: #00b4d8; font-size: 11px; padding: 6px 8px; cursor: pointer; outline: none;
     }
     .ctrl-select:focus { border-color: #00b4d8; }
+    .empty-state {
+      padding: 28px 20px; display: flex; flex-direction: column;
+      align-items: center; gap: 8px; text-align: center;
+    }
+    .empty-icon { font-size: 38px; }
+    .empty-title { font-weight: 700; font-size: 15px; color: #e6edf3; }
+    .empty-hint { font-size: 12px; color: #8b949e; max-width: 260px; }
   `;
 }
 
@@ -674,13 +703,23 @@ class BoschDishwasherCardEditor extends LitElement {
     const activeSensors  = this._config.sensors  ?? DEFAULT_SENSORS;
     const activeControls = this._config.controls ?? DEFAULT_CONTROLS;
 
+    // Build a set of device IDs that have at least one entity from the
+    // bosch_dishwasher platform, then use it to filter the device picker.
+    const boschDeviceIds = new Set();
+    for (const entity of Object.values(this.hass.entities ?? {})) {
+      if (entity.platform === 'bosch_dishwasher' && entity.device_id) {
+        boschDeviceIds.add(entity.device_id);
+      }
+    }
+    const deviceFilter = (device) => boschDeviceIds.has(device.id);
+
     return html`
       <div class="form">
         <ha-device-picker
           .hass=${this.hass}
           .value=${this._config.device ?? ''}
           .configValue=${'device'}
-          .integrations=${['bosch_dishwasher']}
+          .deviceFilter=${deviceFilter}
           label="Bosch dishwasher"
           @value-changed=${this._valueChanged}
         ></ha-device-picker>
@@ -744,8 +783,8 @@ customElements.define('bosch-dishwasher-card-editor', BoschDishwasherCardEditor)
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'bosch-dishwasher-card',
-  name: 'Bosch Dishwasher Card',
-  description: 'Control and monitor a Bosch / Siemens / Neff / Balay dishwasher.',
-  preview: false,
+  name: 'Bosch Dishwasher',
+  description: 'Control and monitor a Bosch / Siemens / Neff / Balay dishwasher connected via Home Connect.',
+  preview: true,
   documentationURL: 'https://github.com/iskael/bosch-dishwasher',
 });
