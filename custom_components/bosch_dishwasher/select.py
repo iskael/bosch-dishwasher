@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from aiohomeconnect.model import EventKey, ProgramKey
 from aiohomeconnect.model.error import HomeConnectError
@@ -43,8 +44,26 @@ PROGRAM_SELECTS: tuple[HomeConnectSelectEntityDescription, ...] = (
 
 
 def _program_to_slug(value: str) -> str:
-    """Convert a Home Connect program key to a stable slug."""
-    return value.lower().replace(".", "_").replace("-", "_")
+    """Convert a Home Connect program key to a snake_case slug.
+
+    Matches the slug format used by HA core's home_connect integration so that
+    strings.json state translations align correctly.
+
+    Examples:
+      Dishcare.Dishwasher.Program.Super60  -> dishcare_dishwasher_program_super_60
+      Dishcare.Dishwasher.Program.AutoHalfLoad -> dishcare_dishwasher_program_auto_half_load
+    """
+    # Replace dots/dashes with underscores first.
+    s = value.replace(".", "_").replace("-", "_")
+    # Insert underscore between a lowercase letter and an uppercase letter (CamelCase split).
+    s = re.sub(r"([a-z])([A-Z])", r"\1_\2", s)
+    # Insert underscore between a run of uppercase letters and a following uppercase+lowercase.
+    s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", s)
+    # Insert underscore between a letter and a digit sequence.
+    s = re.sub(r"([a-zA-Z])(\d)", r"\1_\2", s)
+    # Insert underscore between a digit sequence and a letter.
+    s = re.sub(r"(\d)([a-zA-Z])", r"\1_\2", s)
+    return s.lower()
 
 
 def _get_entities(
