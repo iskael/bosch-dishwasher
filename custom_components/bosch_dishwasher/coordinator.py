@@ -43,8 +43,30 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import (
     API_DEFAULT_RETRY_AFTER,
+    BSH_OPERATION_STATE_FINISHED,
+    BSH_OPERATION_STATE_INACTIVE,
+    BSH_OPERATION_STATE_READY,
     DISHWASHER_APPLIANCE_TYPE,
     DOMAIN,
+)
+
+# Event keys whose values become meaningless once a program is no longer
+# running. Home Connect does NOT push new values for these when the cycle
+# ends — it just flips OperationState — so we clear them ourselves.
+_PROGRAM_RUNTIME_EVENT_KEYS: tuple[EventKey, ...] = (
+    EventKey.BSH_COMMON_OPTION_PROGRAM_PROGRESS,
+    EventKey.BSH_COMMON_OPTION_REMAINING_PROGRAM_TIME,
+    EventKey.BSH_COMMON_OPTION_ESTIMATED_TOTAL_PROGRAM_TIME,
+    EventKey.BSH_COMMON_OPTION_ELAPSED_PROGRAM_TIME,
+    EventKey.BSH_COMMON_OPTION_START_IN_RELATIVE,
+)
+
+_IDLE_OPERATION_STATES: frozenset[str] = frozenset(
+    {
+        BSH_OPERATION_STATE_INACTIVE,
+        BSH_OPERATION_STATE_READY,
+        BSH_OPERATION_STATE_FINISHED,
+    }
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -198,6 +220,8 @@ class HomeConnectApplianceCoordinator(
         else:
             self.data.options = {}
 
+        self._clear_stale_runtime_events(set())
+
         return self.data
 
     async def _fetch_program_options(
@@ -287,9 +311,28 @@ class HomeConnectApplianceCoordinator(
                 data.events[event_key] = event
                 touched.add(event_key)
 
+        self._clear_stale_runtime_events(touched)
+
         self.async_set_updated_data(data)
         if touched:
             self._async_dispatch_event_keys(touched)
+
+    def _clear_stale_runtime_events(self, touched: set[EventKey]) -> None:
+        """Drop program-runtime events once OperationState leaves a running state.
+
+        Home Connect only emits ProgramProgress / RemainingProgramTime while a
+        cycle is active and silently stops updating them when it ends — so
+        without this, sensors would keep reporting the last known values (e.g.
+        92% / 11 min) forever after the dishwasher finishes.
+        """
+        op_status = self.data.status.get(StatusKey.BSH_COMMON_OPERATION_STATE)
+        if op_status is None or not isinstance(op_status.value, str):
+            return
+        if op_status.value not in _IDLE_OPERATION_STATES:
+            return
+        for stale_key in _PROGRAM_RUNTIME_EVENT_KEYS:
+            if self.data.events.pop(stale_key, None) is not None:
+                touched.add(stale_key)
 
     @staticmethod
     def _safe_items(payload: ArrayOfEvents | None) -> list[Event]:

@@ -34,7 +34,7 @@ _LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 _ICON_URL = f"/api/{DOMAIN}/icon.png"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "0.1.1"
+_CARD_VERSION = "0.1.2"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
