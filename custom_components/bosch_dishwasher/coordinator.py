@@ -320,7 +320,14 @@ class HomeConnectRuntimeData:
             ) from err
 
         for appliance in appliances.homeappliances:
-            if appliance.type != DISHWASHER_APPLIANCE_TYPE:
+            _LOGGER.debug(
+                "Found Home Connect appliance: ha_id=%s type=%s name=%s",
+                appliance.ha_id,
+                appliance.type,
+                appliance.name,
+            )
+            if appliance.type.lower() != DISHWASHER_APPLIANCE_TYPE.lower():
+                _LOGGER.debug("Skipping non-dishwasher appliance: %s (%s)", appliance.name, appliance.type)
                 continue
             coordinator = HomeConnectApplianceCoordinator(
                 self.hass, self.entry, self.client, appliance
@@ -328,7 +335,12 @@ class HomeConnectRuntimeData:
             self.appliance_coordinators[appliance.ha_id] = coordinator
 
         if not self.appliance_coordinators:
-            raise ConfigEntryNotReady("No Home Connect dishwashers found")
+            _LOGGER.warning(
+                "No dishwashers found in this Home Connect account. "
+                "Found appliances: %s. The integration will still load and "
+                "listen for new appliances being paired.",
+                [f"{a.name} ({a.type})" for a in appliances.homeappliances],
+            )
 
     @callback
     def async_add_global_listener(
