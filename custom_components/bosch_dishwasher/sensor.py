@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
-from aiohomeconnect.model import EventKey, OptionKey, StatusKey
+from aiohomeconnect.model import EventKey, StatusKey
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -94,7 +94,7 @@ SENSOR_DESCRIPTIONS: tuple[HomeConnectSensorEntityDescription, ...] = (
         options=EVENT_PRESENCE_OPTIONS,
     ),
     HomeConnectSensorEntityDescription(
-        key=OptionKey.BSH_COMMON_OPTION_START_IN_RELATIVE.value,
+        key=EventKey.BSH_COMMON_OPTION_START_IN_RELATIVE.value,
         translation_key="start_in_relative",
         device_class=SensorDeviceClass.TIMESTAMP,
     ),
