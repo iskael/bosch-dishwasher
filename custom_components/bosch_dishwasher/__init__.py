@@ -31,10 +31,9 @@ _LOGGER = logging.getLogger(__name__)
 
 _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
 _LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
-_ICON_URL = f"/api/{DOMAIN}/icon.png"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "0.1.2"
+_CARD_VERSION = "0.1.3"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -133,16 +132,6 @@ async def _async_register_frontend_card(hass: HomeAssistant) -> None:
         _LOGGER.debug("Static path for card already registered: %s", err)
 
     hass.data[_CARD_REGISTERED_KEY] = True
-
-    # Also register the integration icon so it shows in the HA UI.
-    icon_path = hass.config.path(f"custom_components/{DOMAIN}/icon.png")
-    if os.path.exists(icon_path):
-        try:
-            await hass.http.async_register_static_paths(
-                [StaticPathConfig(_ICON_URL, icon_path, cache_headers=True)]
-            )
-        except (RuntimeError, ValueError):
-            pass
 
     # Schedule Lovelace resource registration — defer until HA is fully started
     # so that hass.data["lovelace"]["resources"] is guaranteed to be available.

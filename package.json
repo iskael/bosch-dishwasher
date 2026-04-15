@@ -1,7 +1,7 @@
 {
   "name": "bosch-dishwasher-card",
-  "version": "0.1.2",
-  "description": "Home Assistant Lovelace card for Bosch dishwashers via Home Connect",
+  "version": "0.1.3",
+  "description": "Home Assistant integration + Lovelace card for Bosch / Siemens / Neff / Balay dishwashers via Home Connect",
   "private": true,
   "scripts": {
     "build": "esbuild src/bosch-dishwasher-card.js --bundle --format=esm --target=es2020 --minify --outfile=bosch-dishwasher-card.js && mkdir -p custom_components/bosch_dishwasher/www && cp bosch-dishwasher-card.js custom_components/bosch_dishwasher/www/bosch-dishwasher-card.js",
