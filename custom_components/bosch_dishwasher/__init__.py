@@ -34,7 +34,7 @@ _LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 _ICON_URL = f"/api/{DOMAIN}/icon.png"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "2.2.5"
+_CARD_VERSION = "0.1.1"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -167,20 +167,38 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
         _LOGGER.debug("Lovelace integration not available; skipping resource registration")
         return
 
-    try:
-        resources = hass.data.get("lovelace", {}).get("resources")
-        if resources is None:
-            _LOGGER.debug(
-                "Lovelace resource store not found; add %s manually as a JavaScript module",
-                CARD_URL,
-            )
-            return
+    # In HA ≥ 2024.11 hass.data["lovelace"] is a LovelaceData dataclass
+    # (attribute access), not a dict. Fall back to dict-style for older cores.
+    lovelace_data = hass.data.get("lovelace")
+    resources = getattr(lovelace_data, "resources", None)
+    if resources is None and isinstance(lovelace_data, dict):
+        resources = lovelace_data.get("resources")
 
+    if resources is None:
+        _LOGGER.warning(
+            "Lovelace resource store not available; add %s manually as a "
+            "JavaScript module in Settings → Dashboards → Resources",
+            CARD_URL,
+        )
+        return
+
+    # YAML-mode dashboards use ResourceYAMLCollection which has no
+    # async_create_item — tell the user and bail out cleanly.
+    if not hasattr(resources, "async_create_item"):
+        _LOGGER.warning(
+            "Lovelace is in YAML mode; add the card resource to your YAML: "
+            "url: %s?v=%s, type: module",
+            CARD_URL,
+            _CARD_VERSION,
+        )
+        hass.data[_LOVELACE_RESOURCE_KEY] = True
+        return
+
+    try:
         await resources.async_load()
         existing = [r for r in resources.async_items() if CARD_URL in r.get("url", "")]
         if existing:
             _LOGGER.debug("Lovelace resource %s already registered", CARD_URL)
-            # Mark done so we don't check again this session.
             hass.data[_LOVELACE_RESOURCE_KEY] = True
             return
 
@@ -194,8 +212,9 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
     except Exception as err:  # noqa: BLE001
         _LOGGER.warning(
             "Could not auto-register Lovelace resource for the Bosch Dishwasher card "
-            "(%s). Add it manually: URL=%s, Type=JavaScript module. Error: %s",
+            "(%s). Add it manually: URL=%s?v=%s, Type=JavaScript module. Error: %s",
             CARD_URL,
             CARD_URL,
+            _CARD_VERSION,
             err,
         )
