@@ -1,10 +1,10 @@
 import { LitElement, html, css } from 'lit';
 
-// Localized strings used by the card UI. Looked up by `hass.locale.language`
-// (e.g. 'en', 'es'). Falls back to English when the locale isn't covered.
+// Localized strings used by the card UI.
 const I18N = {
   en: {
     controls: 'CONTROLS',
+    sensors_section: 'SENSORS',
     door: 'Door',
     door_open: '⚠ Open',
     door_closed: 'Closed',
@@ -13,21 +13,31 @@ const I18N = {
     ok: 'OK',
     rinse_aid: 'Rinse aid',
     remote: 'Remote',
+    connected: 'Connected',
+    progress: 'Progress',
     on: 'ON',
     off: 'OFF',
+    yes: 'Yes',
+    no: 'No',
+    power: 'Power',
     turbo: 'TURBO',
     silence: 'SILENCE',
     extra_dry: 'EXTRA DRY',
     half_load: 'HALF LOAD',
-    stop: 'STOP',
+    child_lock: 'CHILD LOCK',
+    stop: '⏹ STOP',
     stopped: 'Stopped',
     running: '● RUNNING',
     finished: '✓ FINISHED',
     aborted: '⚠ ABORTED',
     idle: 'IDLE',
+    sensors_title: 'Sensors',
+    controls_title: 'Controls',
+    show_all: 'Show all',
   },
   es: {
     controls: 'CONTROLES',
+    sensors_section: 'SENSORES',
     door: 'Puerta',
     door_open: '⚠ Abierta',
     door_closed: 'Cerrada',
@@ -36,22 +46,61 @@ const I18N = {
     ok: 'OK',
     rinse_aid: 'Abrillantador',
     remote: 'Remoto',
+    connected: 'Conectado',
+    progress: 'Progreso',
     on: 'ON',
     off: 'OFF',
+    yes: 'Sí',
+    no: 'No',
+    power: 'Encendido',
     turbo: 'TURBO',
     silence: 'SILENCIO',
     extra_dry: 'EXTRA SECO',
     half_load: 'MEDIA CARGA',
-    stop: 'DETENER',
+    child_lock: 'BLOQUEO',
+    stop: '⏹ DETENER',
     stopped: 'Detenido',
     running: '● EN MARCHA',
     finished: '✓ FINALIZADO',
     aborted: '⚠ CANCELADO',
     idle: 'INACTIVO',
+    sensors_title: 'Sensores',
+    controls_title: 'Controles',
+    show_all: 'Mostrar todo',
   },
 };
 
-// Maps Home Connect program keys (slug form) to display labels.
+// All sensors that can be shown in the sensors grid.
+// key   → matches a CAPABILITIES key
+// icon  → emoji shown in the tile
+// labelKey → I18N key for the label
+const SENSOR_DEFS = [
+  { key: 'door',          icon: '🚪', labelKey: 'door'      },
+  { key: 'salt_warning',  icon: '🧂', labelKey: 'salt'      },
+  { key: 'rinse_warning', icon: '💧', labelKey: 'rinse_aid' },
+  { key: 'remote_control',icon: '📡', labelKey: 'remote'    },
+  { key: 'connected',     icon: '🔗', labelKey: 'connected' },
+];
+
+// All controls that can appear in the controls section.
+// key      → matches a CAPABILITIES key
+// type     → 'toggle' | 'select' | 'button'
+// labelKey → I18N key
+const CONTROL_DEFS = [
+  { key: 'power',            type: 'toggle', icon: '⏻', labelKey: 'power'      },
+  { key: 'selected_program', type: 'select', icon: '',   labelKey: null         },
+  { key: 'stop_program',     type: 'button', icon: '',   labelKey: 'stop'       },
+  { key: 'vario_speed',      type: 'toggle', icon: '⚡', labelKey: 'turbo'     },
+  { key: 'silence_on_demand',type: 'toggle', icon: '🔇', labelKey: 'silence'   },
+  { key: 'extra_dry',        type: 'toggle', icon: '🌡', labelKey: 'extra_dry' },
+  { key: 'half_load',        type: 'toggle', icon: '½',  labelKey: 'half_load' },
+  { key: 'child_lock',       type: 'toggle', icon: '🔒', labelKey: 'child_lock'},
+];
+
+const DEFAULT_SENSORS  = SENSOR_DEFS.map(d => d.key);
+const DEFAULT_CONTROLS = ['power', 'selected_program', 'stop_program', 'vario_speed', 'silence_on_demand', 'extra_dry', 'half_load'];
+
+// Maps Home Connect program keys to display labels.
 const PROGRAM_NAMES = {
   dishcare_dishwasher_program_intensiv_70:    'Intensive 70°C',
   dishcare_dishwasher_program_auto_2:         'Auto 2',
@@ -77,28 +126,25 @@ function programLabel(key) {
     .replace(/\b\w/g, c => c.toUpperCase());
 }
 
-// Capabilities consumed by the card. Each entry says how to find the entity
-// in the entity registry given a target device:
-//   domain          → expected entity domain
-//   translationKey  → entity_description.translation_key set by the integration
-//   prefixSuffix    → legacy fallback suffix (only used in entity_prefix mode)
+// Entity capabilities — how to find each entity by device or prefix.
 const CAPABILITIES = {
-  power:               { domain: 'switch',        translationKey: 'power',                       prefixSuffix: 'power' },
-  child_lock:          { domain: 'switch',        translationKey: 'child_lock',                  prefixSuffix: 'child_lock' },
-  vario_speed:         { domain: 'switch',        translationKey: 'vario_speed_plus',            prefixSuffix: 'vario_speed_plus' },
-  silence_on_demand:   { domain: 'switch',        translationKey: 'silence_on_demand',           prefixSuffix: 'silence_on_demand' },
-  extra_dry:           { domain: 'switch',        translationKey: 'extra_dry',                   prefixSuffix: 'extra_dry' },
-  half_load:           { domain: 'switch',        translationKey: 'half_load',                   prefixSuffix: 'half_load' },
-  active_program:      { domain: 'select',        translationKey: 'active_program',              prefixSuffix: 'active_program' },
-  selected_program:    { domain: 'select',        translationKey: 'selected_program',            prefixSuffix: 'selected_program' },
-  door:                { domain: 'sensor',        translationKey: 'door_state',                  prefixSuffix: 'door' },
-  operation_state:     { domain: 'sensor',        translationKey: 'operation_state',             prefixSuffix: 'operation_state' },
-  program_progress:    { domain: 'sensor',        translationKey: 'program_progress',            prefixSuffix: 'program_progress' },
-  program_finish_time: { domain: 'sensor',        translationKey: 'remaining_program_time',      prefixSuffix: 'program_finish_time' },
-  salt_warning:        { domain: 'binary_sensor', translationKey: 'salt_nearly_empty',           prefixSuffix: 'salt_nearly_empty' },
-  rinse_warning:       { domain: 'binary_sensor', translationKey: 'rinse_aid_nearly_empty',      prefixSuffix: 'rinse_aid_nearly_empty' },
-  remote_control:      { domain: 'binary_sensor', translationKey: 'remote_control',              prefixSuffix: 'remote_control' },
-  stop_program:        { domain: 'button',        translationKey: 'stop_program',                prefixSuffix: 'stop_program' },
+  power:               { domain: 'switch',        translationKey: 'power',                  prefixSuffix: 'power' },
+  child_lock:          { domain: 'switch',        translationKey: 'child_lock',             prefixSuffix: 'child_lock' },
+  vario_speed:         { domain: 'switch',        translationKey: 'vario_speed_plus',       prefixSuffix: 'vario_speed_plus' },
+  silence_on_demand:   { domain: 'switch',        translationKey: 'silence_on_demand',      prefixSuffix: 'silence_on_demand' },
+  extra_dry:           { domain: 'switch',        translationKey: 'extra_dry',              prefixSuffix: 'extra_dry' },
+  half_load:           { domain: 'switch',        translationKey: 'half_load',              prefixSuffix: 'half_load' },
+  active_program:      { domain: 'select',        translationKey: 'active_program',         prefixSuffix: 'active_program' },
+  selected_program:    { domain: 'select',        translationKey: 'selected_program',       prefixSuffix: 'selected_program' },
+  door:                { domain: 'sensor',        translationKey: 'door_state',             prefixSuffix: 'door' },
+  operation_state:     { domain: 'sensor',        translationKey: 'operation_state',        prefixSuffix: 'operation_state' },
+  program_progress:    { domain: 'sensor',        translationKey: 'program_progress',       prefixSuffix: 'program_progress' },
+  program_finish_time: { domain: 'sensor',        translationKey: 'remaining_program_time', prefixSuffix: 'program_finish_time' },
+  salt_warning:        { domain: 'binary_sensor', translationKey: 'salt_nearly_empty',      prefixSuffix: 'salt_nearly_empty' },
+  rinse_warning:       { domain: 'binary_sensor', translationKey: 'rinse_aid_nearly_empty', prefixSuffix: 'rinse_aid_nearly_empty' },
+  remote_control:      { domain: 'binary_sensor', translationKey: 'remote_control',         prefixSuffix: 'remote_control' },
+  connected:           { domain: 'binary_sensor', translationKey: 'connected',              prefixSuffix: 'connected' },
+  stop_program:        { domain: 'button',        translationKey: 'stop_program',           prefixSuffix: 'stop_program' },
 };
 
 class BoschDishwasherCard extends LitElement {
@@ -107,13 +153,15 @@ class BoschDishwasherCard extends LitElement {
     config: { attribute: false },
   };
 
-  // Lovelace card config. Accepts either `device` (preferred) or
-  // legacy `entity_prefix` (deprecated, will be removed in v1.0.0).
   setConfig(config) {
     if (!config.device && !config.entity_prefix) {
       throw new Error('A `device` (Bosch dishwasher) is required.');
     }
-    this.config = config;
+    this.config = {
+      sensors:  DEFAULT_SENSORS,
+      controls: DEFAULT_CONTROLS,
+      ...config,
+    };
     if (config.entity_prefix && !config.device) {
       // eslint-disable-next-line no-console
       console.warn(
@@ -123,88 +171,55 @@ class BoschDishwasherCard extends LitElement {
     }
   }
 
-  // Stub used by Lovelace's "Add Card" picker.
   static getStubConfig() {
-    return { type: 'custom:bosch-dishwasher-card', device: '' };
+    return {
+      type: 'custom:bosch-dishwasher-card',
+      device: '',
+      sensors:  DEFAULT_SENSORS,
+      controls: DEFAULT_CONTROLS,
+    };
   }
 
-  // GUI editor element; defined further down. Lovelace will instantiate it
-  // and pass `hass` + `config` so the user gets a device picker.
   static getConfigElement() {
     return document.createElement('bosch-dishwasher-card-editor');
   }
 
   getCardSize() { return 4; }
 
-  // ─────────────────────────────────────────────────────────────────
-  // Locale lookup
-  // ─────────────────────────────────────────────────────────────────
   _t(key) {
     const lang = (this.hass?.locale?.language ?? 'en').split('-')[0];
     return (I18N[lang] ?? I18N.en)[key] ?? I18N.en[key] ?? key;
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // Entity resolution
-  // ─────────────────────────────────────────────────────────────────
-  // Resolve an entity_id for a capability, given current config + hass.
-  // Returns undefined if no entity can be found.
+  // ── Entity resolution ──────────────────────────────────────────────
   _entityId(capability) {
     const cap = CAPABILITIES[capability];
     if (!cap) return undefined;
-
-    // Preferred path: `device` config + hass.entities lookup.
     if (this.config.device && this.hass?.entities) {
-      // hass.entities is keyed by entity_id; each value has a `device_id`
-      // and a `translation_key`. Filter to entities on our device whose
-      // translation_key matches the capability's expected translation_key.
       for (const entity of Object.values(this.hass.entities)) {
         if (entity.device_id !== this.config.device) continue;
         if (!entity.entity_id?.startsWith(`${cap.domain}.`)) continue;
-        if (entity.translation_key === cap.translationKey) {
-          return entity.entity_id;
-        }
+        if (entity.translation_key === cap.translationKey) return entity.entity_id;
       }
       return undefined;
     }
-
-    // Legacy fallback: entity_prefix + suffix string concat.
     if (this.config.entity_prefix) {
       return `${cap.domain}.${this.config.entity_prefix}_${cap.prefixSuffix}`;
     }
-
     return undefined;
   }
 
-  _entity(capability) {
-    const id = this._entityId(capability);
-    return id ? this.hass?.states?.[id] : undefined;
-  }
-
-  _state(capability) {
-    return this._entity(capability)?.state ?? 'unavailable';
-  }
-
-  _attr(capability, attr) {
-    return this._entity(capability)?.attributes?.[attr];
-  }
-
+  _entity(capability)             { const id = this._entityId(capability); return id ? this.hass?.states?.[id] : undefined; }
+  _state(capability)              { return this._entity(capability)?.state ?? 'unavailable'; }
+  _attr(capability, attr)         { return this._entity(capability)?.attributes?.[attr]; }
   _call(capability, service, data = {}) {
     const id = this._entityId(capability);
     if (!id || !this.hass) return;
-    const domain = id.split('.')[0];
-    this.hass.callService(domain, service, { entity_id: id, ...data });
+    this.hass.callService(id.split('.')[0], service, { entity_id: id, ...data });
   }
 
-  // List of every entity the card watches — used by shouldUpdate to skip
-  // re-renders triggered by unrelated hass updates.
   _watchedEntities() {
-    const ids = [];
-    for (const cap of Object.keys(CAPABILITIES)) {
-      const id = this._entityId(cap);
-      if (id) ids.push(id);
-    }
-    return ids;
+    return Object.keys(CAPABILITIES).map(c => this._entityId(c)).filter(Boolean);
   }
 
   shouldUpdate(changedProps) {
@@ -218,14 +233,9 @@ class BoschDishwasherCard extends LitElement {
     return false;
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // Derived state helpers
-  // ─────────────────────────────────────────────────────────────────
+  // ── Derived state ──────────────────────────────────────────────────
   _operationState() { return this._state('operation_state').toLowerCase(); }
-  _isRunning() {
-    const s = this._operationState();
-    return s === 'run' || s === 'running';
-  }
+  _isRunning() { const s = this._operationState(); return s === 'run' || s === 'running'; }
 
   _badge() {
     const s = this._operationState();
@@ -234,8 +244,6 @@ class BoschDishwasherCard extends LitElement {
     if (s === 'aborting' || s === 'aborted') return { text: this._t('aborted'),  cls: 'badge-aborted'  };
     return { text: s ? s.toUpperCase() : this._t('idle'), cls: 'badge-idle' };
   }
-
-  _isDoorOpen() { return this._state('door').toLowerCase() === 'open'; }
 
   _isWarning(capability) {
     const s = this._state(capability).toLowerCase();
@@ -247,8 +255,6 @@ class BoschDishwasherCard extends LitElement {
     return Number.isNaN(n) ? 0 : Math.min(100, Math.max(0, n));
   }
 
-  // The integration exposes remaining time as a TIMESTAMP sensor (ISO datetime).
-  // Format it as the absolute finish time, like "21:42".
   _finishTime() {
     const s = this._state('program_finish_time');
     if (!s || s === 'unavailable' || s === 'unknown' || s === '0') return null;
@@ -261,6 +267,7 @@ class BoschDishwasherCard extends LitElement {
     return s;
   }
 
+  // ── SVG illustration ───────────────────────────────────────────────
   _renderDishwasher(state) {
     const displayText =
       state === 'running'  ? '••••' :
@@ -317,13 +324,132 @@ class BoschDishwasherCard extends LitElement {
     `;
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────
+  // ── Sensor tile renderer ───────────────────────────────────────────
+  _renderSensor(def) {
+    switch (def.key) {
+      case 'door': {
+        const open = this._state('door').toLowerCase() === 'open';
+        return html`
+          <div class="sensor ${open ? 'warn' : ''}">
+            <span class="sensor-icon">${def.icon}</span>
+            <span class="sensor-label">${this._t(def.labelKey)}</span>
+            <span class="sensor-value">${open ? this._t('door_open') : this._t('door_closed')}</span>
+          </div>`;
+      }
+      case 'salt_warning': {
+        const warn = this._isWarning('salt_warning');
+        return html`
+          <div class="sensor ${warn ? 'warn' : ''}">
+            <span class="sensor-icon">${def.icon}</span>
+            <span class="sensor-label">${this._t(def.labelKey)}</span>
+            <span class="sensor-value">${warn ? this._t('salt_low') : this._t('ok')}</span>
+          </div>`;
+      }
+      case 'rinse_warning': {
+        const warn = this._isWarning('rinse_warning');
+        return html`
+          <div class="sensor ${warn ? 'warn' : ''}">
+            <span class="sensor-icon">${def.icon}</span>
+            <span class="sensor-label">${this._t(def.labelKey)}</span>
+            <span class="sensor-value">${warn ? this._t('salt_low') : this._t('ok')}</span>
+          </div>`;
+      }
+      case 'remote_control': {
+        const on = this._state('remote_control') === 'on';
+        return html`
+          <div class="sensor">
+            <span class="sensor-icon">${def.icon}</span>
+            <span class="sensor-label">${this._t(def.labelKey)}</span>
+            <span class="sensor-value">${on ? this._t('on') : this._t('off')}</span>
+          </div>`;
+      }
+      case 'connected': {
+        const on = this._state('connected') === 'on';
+        return html`
+          <div class="sensor ${!on ? 'warn' : ''}">
+            <span class="sensor-icon">${def.icon}</span>
+            <span class="sensor-label">${this._t(def.labelKey)}</span>
+            <span class="sensor-value">${on ? this._t('yes') : this._t('no')}</span>
+          </div>`;
+      }
+      default: return html``;
+    }
+  }
+
+  // ── Control renderer ───────────────────────────────────────────────
+  _renderControl(def, running) {
+    switch (def.key) {
+      case 'power': {
+        const on = this._state('power') === 'on';
+        return html`
+          <button class="ctrl-btn ${on ? 'active' : ''}" @click=${() => this._call('power', 'toggle')}>
+            ${def.icon} ${on ? this._t('on') : this._t('off')}
+          </button>`;
+      }
+      case 'selected_program': {
+        const selectedProgram = this._state('selected_program');
+        const programOptions  = this._attr('selected_program', 'options') ?? [];
+        return html`
+          <select class="ctrl-select"
+                  .value=${selectedProgram}
+                  @change=${(e) => this._call('selected_program', 'select_option', { option: e.target.value })}>
+            ${programOptions.length === 0
+              ? html`<option disabled>—</option>`
+              : programOptions.map(opt => html`<option value="${opt}">${programLabel(opt)}</option>`)}
+          </select>`;
+      }
+      case 'stop_program':
+        return html`
+          <button class="ctrl-btn danger" ?disabled=${!running}
+                  @click=${() => this._call('stop_program', 'press')}>
+            ${this._t('stop')}
+          </button>`;
+      case 'vario_speed': {
+        const on = this._state('vario_speed') === 'on';
+        return html`
+          <button class="ctrl-btn ${on ? 'active' : ''}" @click=${() => this._call('vario_speed', 'toggle')}>
+            ${def.icon} ${this._t(def.labelKey)}
+          </button>`;
+      }
+      case 'silence_on_demand': {
+        const s   = this._state('silence_on_demand');
+        const on  = s === 'on';
+        const avail = s !== 'unavailable';
+        return html`
+          <button class="ctrl-btn ${on ? 'active' : ''}" ?disabled=${!avail}
+                  @click=${() => this._call('silence_on_demand', 'toggle')}>
+            ${def.icon} ${this._t(def.labelKey)}
+          </button>`;
+      }
+      case 'extra_dry': {
+        const on = this._state('extra_dry') === 'on';
+        return html`
+          <button class="ctrl-btn ${on ? 'active' : ''}" @click=${() => this._call('extra_dry', 'toggle')}>
+            ${def.icon} ${this._t(def.labelKey)}
+          </button>`;
+      }
+      case 'half_load': {
+        const on = this._state('half_load') === 'on';
+        return html`
+          <button class="ctrl-btn ${on ? 'active' : ''}" @click=${() => this._call('half_load', 'toggle')}>
+            ${def.icon} ${this._t(def.labelKey)}
+          </button>`;
+      }
+      case 'child_lock': {
+        const on = this._state('child_lock') === 'on';
+        return html`
+          <button class="ctrl-btn ${on ? 'active' : ''}" @click=${() => this._call('child_lock', 'toggle')}>
+            ${def.icon} ${this._t(def.labelKey)}
+          </button>`;
+      }
+      default: return html``;
+    }
+  }
+
+  // ── Main render ────────────────────────────────────────────────────
   render() {
     if (!this.hass || !this.config) return html``;
 
-    // If we have a device, prefer its registry name; else fall back to config.
     const deviceName =
       (this.config.device && this.hass.devices?.[this.config.device]?.name_by_user)
       ?? (this.config.device && this.hass.devices?.[this.config.device]?.name)
@@ -331,35 +457,29 @@ class BoschDishwasherCard extends LitElement {
       ?? 'Bosch Dishwasher';
     const name = this.config.name ?? deviceName;
 
-    const running     = this._isRunning();
-    const badge       = this._badge();
-    const dwState     = running                          ? 'running'
-                      : badge.cls === 'badge-finished'   ? 'finished'
-                      : badge.cls === 'badge-aborted'    ? 'aborted'
-                      :                                    'idle';
-    const progress    = this._progress();
-    const finishTime  = this._finishTime();
+    const running    = this._isRunning();
+    const badge      = this._badge();
+    const dwState    = running                        ? 'running'
+                     : badge.cls === 'badge-finished' ? 'finished'
+                     : badge.cls === 'badge-aborted'  ? 'aborted'
+                     :                                  'idle';
+    const progress   = this._progress();
+    const finishTime = this._finishTime();
     const activeProgram   = this._state('active_program');
     const selectedProgram = this._state('selected_program');
     const _programKey = (activeProgram && activeProgram !== 'unavailable' && activeProgram !== 'unknown')
-      ? activeProgram
-      : selectedProgram;
+      ? activeProgram : selectedProgram;
     const displayProgram = (!_programKey || _programKey === 'unavailable' || _programKey === 'unknown')
-      ? this._t('stopped')
-      : programLabel(_programKey);
-    const doorOpen   = this._isDoorOpen();
-    const saltWarn   = this._isWarning('salt_warning');
-    const rinseWarn  = this._isWarning('rinse_warning');
-    const remoteOn   = this._state('remote_control') === 'on';
+      ? this._t('stopped') : programLabel(_programKey);
 
-    const powerOn          = this._state('power') === 'on';
-    const turboOn          = this._state('vario_speed') === 'on';
-    const silenceState     = this._state('silence_on_demand');
-    const silenceOn        = silenceState === 'on';
-    const silenceAvailable = silenceState !== 'unavailable';
-    const extraDryOn       = this._state('extra_dry') === 'on';
-    const halfLoadOn       = this._state('half_load') === 'on';
-    const programOptions   = this._attr('selected_program', 'options') ?? [];
+    // Filter to configured lists
+    const activeSensors  = SENSOR_DEFS.filter(d  => (this.config.sensors  ?? DEFAULT_SENSORS ).includes(d.key));
+    const activeControls = CONTROL_DEFS.filter(d => (this.config.controls ?? DEFAULT_CONTROLS).includes(d.key));
+
+    // Split controls: first row = power + program selector + stop; rest go to grid
+    const firstRowKeys = ['power', 'selected_program', 'stop_program'];
+    const firstRow  = activeControls.filter(d => firstRowKeys.includes(d.key));
+    const gridCtrls = activeControls.filter(d => !firstRowKeys.includes(d.key));
 
     return html`
       <ha-card>
@@ -381,67 +501,27 @@ class BoschDishwasherCard extends LitElement {
             </div>
           </div>
 
-          <div class="sensors">
-            <div class="sensor ${doorOpen ? 'warn' : ''}">
-              <span class="sensor-icon">🚪</span>
-              <span class="sensor-label">${this._t('door')}</span>
-              <span class="sensor-value">${doorOpen ? this._t('door_open') : this._t('door_closed')}</span>
+          ${activeSensors.length > 0 ? html`
+            <div class="sensors">
+              ${activeSensors.map(d => this._renderSensor(d))}
             </div>
-            <div class="sensor ${saltWarn ? 'warn' : ''}">
-              <span class="sensor-icon">🧂</span>
-              <span class="sensor-label">${this._t('salt')}</span>
-              <span class="sensor-value">${saltWarn ? this._t('salt_low') : this._t('ok')}</span>
-            </div>
-            <div class="sensor ${rinseWarn ? 'warn' : ''}">
-              <span class="sensor-icon">💧</span>
-              <span class="sensor-label">${this._t('rinse_aid')}</span>
-              <span class="sensor-value">${rinseWarn ? this._t('salt_low') : this._t('ok')}</span>
-            </div>
-            <div class="sensor">
-              <span class="sensor-icon">📡</span>
-              <span class="sensor-label">${this._t('remote')}</span>
-              <span class="sensor-value">${remoteOn ? this._t('on') : this._t('off')}</span>
-            </div>
-          </div>
+          ` : ''}
 
-          <div class="controls">
-            <div class="controls-label">${this._t('controls')}</div>
-            <div class="controls-row">
-              <button class="ctrl-btn ${powerOn ? 'active' : ''}"
-                      @click=${() => this._call('power','toggle')}>
-                ⏻ ${powerOn ? this._t('on') : this._t('off')}
-              </button>
-              <select class="ctrl-select"
-                      .value=${selectedProgram}
-                      @change=${(e) => this._call('selected_program','select_option',{ option: e.target.value })}>
-                ${programOptions.length === 0
-                  ? html`<option disabled>—</option>`
-                  : programOptions.map(opt => html`<option value="${opt}">${programLabel(opt)}</option>`)}
-              </select>
-              <button class="ctrl-btn danger" ?disabled=${!running}
-                      @click=${() => this._call('stop_program','press')}>
-                ⏹ ${this._t('stop')}
-              </button>
+          ${activeControls.length > 0 ? html`
+            <div class="controls">
+              <div class="controls-label">${this._t('controls')}</div>
+              ${firstRow.length > 0 ? html`
+                <div class="controls-row">
+                  ${firstRow.map(d => this._renderControl(d, running))}
+                </div>
+              ` : ''}
+              ${gridCtrls.length > 0 ? html`
+                <div class="controls-grid">
+                  ${gridCtrls.map(d => this._renderControl(d, running))}
+                </div>
+              ` : ''}
             </div>
-            <div class="controls-grid">
-              <button class="ctrl-btn ${turboOn ? 'active' : ''}"
-                      @click=${() => this._call('vario_speed','toggle')}>
-                ⚡ ${this._t('turbo')}
-              </button>
-              <button class="ctrl-btn ${silenceOn ? 'active' : ''}" ?disabled=${!silenceAvailable}
-                      @click=${() => this._call('silence_on_demand','toggle')}>
-                🔇 ${this._t('silence')}
-              </button>
-              <button class="ctrl-btn ${extraDryOn ? 'active' : ''}"
-                      @click=${() => this._call('extra_dry','toggle')}>
-                🌡 ${this._t('extra_dry')}
-              </button>
-              <button class="ctrl-btn ${halfLoadOn ? 'active' : ''}"
-                      @click=${() => this._call('half_load','toggle')}>
-                ½ ${this._t('half_load')}
-              </button>
-            </div>
-          </div>
+          ` : ''}
         </div>
       </ha-card>
     `;
@@ -449,12 +529,8 @@ class BoschDishwasherCard extends LitElement {
 
   static styles = css`
     ha-card {
-      background: #0d1117;
-      color: #e6edf3;
-      border-radius: 12px;
-      overflow: hidden;
-      content-visibility: auto;
-      contain-intrinsic-size: 0 260px;
+      background: #0d1117; color: #e6edf3; border-radius: 12px;
+      overflow: hidden; content-visibility: auto; contain-intrinsic-size: 0 260px;
     }
     .card-content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
     .header { display: flex; align-items: flex-start; gap: 12px; }
@@ -473,7 +549,7 @@ class BoschDishwasherCard extends LitElement {
     .badge-idle     { background: #21262d; color: #8b949e; }
     .program-line { color: #8b949e; font-size: 12px; margin-bottom: 5px; }
     .progress-bar { background: #21262d; height: 4px; border-radius: 2px; overflow: hidden; margin-bottom: 3px; }
-    .progress-fill { height: 100%; background: linear-gradient(90deg, #00b4d8, #0077b6); border-radius: 2px; transition: width .5s ease; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg,#00b4d8,#0077b6); border-radius: 2px; transition: width .5s ease; }
     .progress-label { font-size: 11px; color: #8b949e; }
     .bosch-dw { display: block; transition: opacity .3s; }
     .bosch-dw.idle { opacity: 0.55; }
@@ -498,12 +574,7 @@ class BoschDishwasherCard extends LitElement {
     .bosch-dw.running .water-drops .d4 { animation-delay: 1.05s; }
     .bosch-dw.running .water-drops .d5 { animation-delay: 1.4s; }
     .bosch-dw.running .water-drops .d6 { animation-delay: 1.75s; }
-    @keyframes drop-fall {
-      0%   { transform: translateY(-4px); opacity: 0; }
-      12%  { opacity: 0.85; }
-      88%  { opacity: 0.85; }
-      100% { transform: translateY(70px); opacity: 0; }
-    }
+    @keyframes drop-fall { 0% { transform: translateY(-4px); opacity: 0; } 12% { opacity: 0.85; } 88% { opacity: 0.85; } 100% { transform: translateY(70px); opacity: 0; } }
     @keyframes led-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
     @keyframes blink-text { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
     @keyframes blink-badge { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
@@ -537,9 +608,7 @@ class BoschDishwasherCard extends LitElement {
   `;
 }
 
-// ─────────────────────────────────────────────────────────────────
-// GUI editor — gives users a device picker filtered to our integration
-// ─────────────────────────────────────────────────────────────────
+// ── GUI Editor ─────────────────────────────────────────────────────────────
 class BoschDishwasherCardEditor extends LitElement {
   static properties = {
     hass:    { attribute: false },
@@ -547,22 +616,54 @@ class BoschDishwasherCardEditor extends LitElement {
   };
 
   setConfig(config) {
-    this._config = config;
+    this._config = {
+      sensors:  DEFAULT_SENSORS,
+      controls: DEFAULT_CONTROLS,
+      ...config,
+    };
   }
 
   _valueChanged(ev) {
     if (!this._config) return;
     const target = ev.target;
-    const field = target.configValue;
+    const field  = target.configValue;
     if (!field) return;
     const value = ev.detail?.value ?? target.value;
-    const next = { ...this._config, [field]: value };
+    const next  = { ...this._config, [field]: value };
     if (field === 'name' && !value) delete next.name;
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: next } }));
   }
 
+  _toggleItem(listKey, itemKey) {
+    const current = [...(this._config[listKey] ?? [])];
+    const idx = current.indexOf(itemKey);
+    if (idx >= 0) current.splice(idx, 1);
+    else current.push(itemKey);
+    const next = { ...this._config, [listKey]: current };
+    this._config = next;
+    this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: next } }));
+  }
+
+  _lang() {
+    const lang = (this.hass?.locale?.language ?? 'en').split('-')[0];
+    return (I18N[lang] ?? I18N.en);
+  }
+  _t(key) { return this._lang()[key] ?? I18N.en[key] ?? key; }
+
+  _sensorLabel(def) {
+    return this._t(def.labelKey) ?? def.key;
+  }
+
+  _controlLabel(def) {
+    if (def.key === 'selected_program') return 'Programa / Program';
+    return `${def.icon} ${this._t(def.labelKey)}`.trim();
+  }
+
   render() {
     if (!this.hass || !this._config) return html``;
+    const activeSensors  = this._config.sensors  ?? DEFAULT_SENSORS;
+    const activeControls = this._config.controls ?? DEFAULT_CONTROLS;
+
     return html`
       <div class="form">
         <ha-device-picker
@@ -573,19 +674,57 @@ class BoschDishwasherCardEditor extends LitElement {
           label="Bosch dishwasher"
           @value-changed=${this._valueChanged}
         ></ha-device-picker>
+
         <ha-textfield
           .value=${this._config.name ?? ''}
           .configValue=${'name'}
           label="Name (optional)"
           @input=${this._valueChanged}
         ></ha-textfield>
+
+        <div class="section-title">${this._t('sensors_title')}</div>
+        <div class="check-grid">
+          ${SENSOR_DEFS.map(def => html`
+            <label class="check-row">
+              <input type="checkbox"
+                     .checked=${activeSensors.includes(def.key)}
+                     @change=${() => this._toggleItem('sensors', def.key)}>
+              <span>${def.icon} ${this._sensorLabel(def)}</span>
+            </label>
+          `)}
+        </div>
+
+        <div class="section-title">${this._t('controls_title')}</div>
+        <div class="check-grid">
+          ${CONTROL_DEFS.map(def => html`
+            <label class="check-row">
+              <input type="checkbox"
+                     .checked=${activeControls.includes(def.key)}
+                     @change=${() => this._toggleItem('controls', def.key)}>
+              <span>${this._controlLabel(def)}</span>
+            </label>
+          `)}
+        </div>
       </div>
     `;
   }
 
   static styles = css`
-    .form { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
+    .form { display: flex; flex-direction: column; gap: 14px; padding: 8px 0; }
     ha-device-picker, ha-textfield { display: block; width: 100%; }
+    .section-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 1px;
+      color: var(--secondary-text-color, #8b949e);
+      text-transform: uppercase; margin-top: 4px;
+    }
+    .check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .check-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; cursor: pointer;
+      padding: 4px 6px; border-radius: 6px;
+    }
+    .check-row:hover { background: var(--secondary-background-color, #21262d); }
+    .check-row input { accent-color: var(--primary-color, #00b4d8); width: 16px; height: 16px; cursor: pointer; }
   `;
 }
 
