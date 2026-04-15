@@ -94,7 +94,8 @@
           "present": "Present",
           "confirmed": "Confirmed"
         }
-      }
+      },
+      "start_in_relative": {"name": "Scheduled start"}
     },
     "switch": {
       "power": {"name": "Power"},

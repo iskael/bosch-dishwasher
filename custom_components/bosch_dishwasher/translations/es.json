@@ -86,7 +86,8 @@
           "present": "Presente",
           "confirmed": "Confirmado"
         }
-      }
+      },
+      "start_in_relative": {"name": "Inicio programado"}
     },
     "switch": {
       "power": {"name": "Encendido"},

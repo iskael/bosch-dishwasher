@@ -31,6 +31,8 @@ const I18N = {
     finished: '✓ FINISHED',
     aborted: '⚠ ABORTED',
     idle: 'IDLE',
+    delayed_start: 'DELAYED',
+    starts_at: 'Starts at',
     sensors_title: 'Sensors',
     controls_title: 'Controls',
     show_all: 'Show all',
@@ -64,6 +66,8 @@ const I18N = {
     finished: '✓ FINALIZADO',
     aborted: '⚠ CANCELADO',
     idle: 'INACTIVO',
+    delayed_start: 'DIFERIDO',
+    starts_at: 'Inicia a las',
     sensors_title: 'Sensores',
     controls_title: 'Controles',
     show_all: 'Mostrar todo',
@@ -144,6 +148,7 @@ const CAPABILITIES = {
   rinse_warning:       { domain: 'binary_sensor', translationKey: 'rinse_aid_nearly_empty', prefixSuffix: 'rinse_aid_nearly_empty' },
   remote_control:      { domain: 'binary_sensor', translationKey: 'remote_control',         prefixSuffix: 'remote_control' },
   connected:           { domain: 'binary_sensor', translationKey: 'connected',              prefixSuffix: 'connected' },
+  start_in_relative:   { domain: 'sensor',        translationKey: 'start_in_relative',      prefixSuffix: 'start_in_relative' },
   stop_program:        { domain: 'button',        translationKey: 'stop_program',           prefixSuffix: 'stop_program' },
 };
 
@@ -239,10 +244,25 @@ class BoschDishwasherCard extends LitElement {
 
   _badge() {
     const s = this._operationState();
-    if (s === 'run' || s === 'running')      return { text: this._t('running'),  cls: 'badge-running'  };
-    if (s === 'finished' || s === 'finish')  return { text: this._t('finished'), cls: 'badge-finished' };
-    if (s === 'aborting' || s === 'aborted') return { text: this._t('aborted'),  cls: 'badge-aborted'  };
+    if (s === 'run' || s === 'running')        return { text: this._t('running'),       cls: 'badge-running'  };
+    if (s === 'finished' || s === 'finish')    return { text: this._t('finished'),      cls: 'badge-finished' };
+    if (s === 'aborting' || s === 'aborted')   return { text: this._t('aborted'),       cls: 'badge-aborted'  };
+    if (s === 'delayed_start' || s === 'delayedstart') return { text: this._t('delayed_start'), cls: 'badge-delayed'  };
     return { text: s ? s.toUpperCase() : this._t('idle'), cls: 'badge-idle' };
+  }
+
+  // When in delayed_start, calculate the absolute start time from the
+  // start_in_relative sensor (ISO timestamp set by the integration as now+seconds).
+  _startTime() {
+    const s = this._state('start_in_relative');
+    if (!s || s === 'unavailable' || s === 'unknown') return null;
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      const date = new Date(s);
+      if (!Number.isNaN(date.getTime())) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+    return null;
   }
 
   _isWarning(capability) {
@@ -457,14 +477,16 @@ class BoschDishwasherCard extends LitElement {
       ?? 'Bosch Dishwasher';
     const name = this.config.name ?? deviceName;
 
-    const running    = this._isRunning();
-    const badge      = this._badge();
-    const dwState    = running                        ? 'running'
-                     : badge.cls === 'badge-finished' ? 'finished'
-                     : badge.cls === 'badge-aborted'  ? 'aborted'
-                     :                                  'idle';
-    const progress   = this._progress();
-    const finishTime = this._finishTime();
+    const running      = this._isRunning();
+    const badge        = this._badge();
+    const isDelayed    = badge.cls === 'badge-delayed';
+    const dwState      = running                        ? 'running'
+                       : badge.cls === 'badge-finished' ? 'finished'
+                       : badge.cls === 'badge-aborted'  ? 'aborted'
+                       :                                  'idle';
+    const progress     = this._progress();
+    const finishTime   = this._finishTime();
+    const startTime    = isDelayed ? this._startTime() : null;
     const activeProgram   = this._state('active_program');
     const selectedProgram = this._state('selected_program');
     const _programKey = (activeProgram && activeProgram !== 'unavailable' && activeProgram !== 'unknown')
@@ -492,7 +514,7 @@ class BoschDishwasherCard extends LitElement {
                 <span class="badge ${badge.cls}">${badge.text}</span>
               </div>
               <div class="program-line">
-                ${displayProgram}${finishTime ? html` · ${finishTime}` : ''}
+                ${displayProgram}${finishTime ? html` · ${finishTime}` : ''}${startTime ? html` · ${this._t('starts_at')} ${startTime}` : ''}
               </div>
               <div class="progress-bar">
                 <div class="progress-fill" style="width:${progress}%"></div>
@@ -546,6 +568,7 @@ class BoschDishwasherCard extends LitElement {
     .badge-running  { background: #00b4d8; color: #000; animation: blink-badge 1s step-end infinite; }
     .badge-finished { background: #34d39920; color: #34d399; border: 1px solid #34d39940; }
     .badge-aborted  { background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }
+    .badge-delayed  { background: #78350f20; color: #f59e0b; border: 1px solid #f59e0b40; }
     .badge-idle     { background: #21262d; color: #8b949e; }
     .program-line { color: #8b949e; font-size: 12px; margin-bottom: 5px; }
     .progress-bar { background: #21262d; height: 4px; border-radius: 2px; overflow: hidden; margin-bottom: 3px; }

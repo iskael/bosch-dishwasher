@@ -155,10 +155,22 @@ def setup_home_connect_entry(
     ]
     | None = None,
 ) -> None:
-    """Wire up paired/depaired callbacks for a platform."""
+    """Wire up paired/depaired callbacks and add entities for existing appliances."""
     known_entity_unique_ids: dict[str, str] = {}
     changed_options_listener_remove_callbacks: dict[str, list[Callable[[], None]]] = (
         defaultdict(list)
+    )
+
+    # Add entities for appliances that are already known at setup time.
+    # Without this, entities only appear after the next PAIRED/CONNECTED SSE event.
+    _handle_paired_or_connected_appliance(
+        hass,
+        entry,
+        known_entity_unique_ids,
+        get_entities_for_appliance,
+        get_option_entities_for_appliance,
+        changed_options_listener_remove_callbacks,
+        async_add_entities,
     )
 
     entry.async_on_unload(
