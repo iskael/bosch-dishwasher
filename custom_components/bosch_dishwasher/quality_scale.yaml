@@ -8,7 +8,12 @@ rules:
     comment: |
       The integration is push-based via SSE. Coordinator update_interval is set
       to 30 minutes purely as a safety-net poll if the SSE stream dies silently.
-  brands: done
+  brands:
+    status: todo
+    comment: |
+      Brand icons are shipped inline under custom_components/bosch_dishwasher/brand/
+      per the HA 2026.3 brands proxy API, and HA core renders them correctly.
+      The home-assistant/brands repo no longer accepts custom integrations.
   common-modules: done
   config-flow-test-coverage: todo
   config-flow: done
@@ -43,24 +48,24 @@ rules:
   reauthentication-flow: done
   test-coverage: todo
 
-  # Gold
+  # Gold (all aspirational — no test suite yet)
   devices: done
   diagnostics: done
   discovery-update-info: todo
   discovery: done
-  docs-data-update: done
-  docs-examples: done
-  docs-known-limitations: done
+  docs-data-update: todo
+  docs-examples: todo
+  docs-known-limitations: todo
   docs-supported-devices: done
-  docs-supported-functions: done
-  docs-troubleshooting: done
-  docs-use-cases: done
+  docs-supported-functions: todo
+  docs-troubleshooting: todo
+  docs-use-cases: todo
   dynamic-devices: done
   entity-category: done
   entity-device-class: done
   entity-disabled-by-default: done
   entity-translations: done
-  exception-translations: done
+  exception-translations: todo
   icon-translations: todo
   reconfiguration-flow: todo
   repair-issues:

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from aiohomeconnect.model import EventKey, SettingKey, StatusKey
-
 from homeassistant.const import Platform
 
 DOMAIN = "bosch_dishwasher"
@@ -45,15 +43,3 @@ BSH_DOOR_STATE_LOCKED = "BSH.Common.EnumType.DoorState.Locked"
 BSH_EVENT_STATE_PRESENT = "BSH.Common.EnumType.EventPresentState.Present"
 BSH_EVENT_STATE_CONFIRMED = "BSH.Common.EnumType.EventPresentState.Confirmed"
 BSH_EVENT_STATE_OFF = "BSH.Common.EnumType.EventPresentState.Off"
-
-# Migration: maps legacy entity id suffixes (from v0.1.x of this integration)
-# to current aiohomeconnect keys. Used by async_migrate_entry.
-OLD_NEW_UNIQUE_ID_SUFFIX_MAP: dict[str, str] = {
-    "ChildLock": SettingKey.BSH_COMMON_CHILD_LOCK.value,
-    "Operation State": StatusKey.BSH_COMMON_OPERATION_STATE.value,
-    "Power": SettingKey.BSH_COMMON_POWER_STATE.value,
-    "Remaining Program Time": EventKey.BSH_COMMON_OPTION_REMAINING_PROGRAM_TIME.value,
-    "Program Progress": EventKey.BSH_COMMON_OPTION_PROGRAM_PROGRESS.value,
-    "Remote Control": StatusKey.BSH_COMMON_REMOTE_CONTROL_ACTIVE.value,
-    "Remote Start": StatusKey.BSH_COMMON_REMOTE_CONTROL_START_ALLOWED.value,
-}

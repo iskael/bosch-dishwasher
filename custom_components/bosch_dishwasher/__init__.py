@@ -9,9 +9,13 @@ import aiohttp
 from aiohomeconnect.client import Client as HomeConnectClient
 
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import Event, HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+)
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.config_entry_oauth2_flow import (
     ImplementationUnavailableError,
@@ -19,7 +23,7 @@ from homeassistant.helpers.config_entry_oauth2_flow import (
     async_get_config_entry_implementation,
 )
 from homeassistant.helpers.typing import ConfigType
-from homeassistant.loader import async_get_integration
+from homeassistant.loader import IntegrationNotFound, async_get_integration
 
 from .api import AsyncConfigEntryAuth
 from .const import CARD_URL, DOMAIN, PLATFORMS
@@ -78,14 +82,16 @@ async def async_setup_entry(
                 device.id, remove_config_entry_id=entry.entry_id
             )
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
+    # Fetch appliance state (settings, status, programs, commands) BEFORE
+    # forwarding platform setup. The entity-add callbacks in each platform
+    # filter the description list against coordinator.data.settings /
+    # .commands / .options — if the coordinator is empty when platforms
+    # are loaded, child_lock, open_door, pause/resume/stop buttons and
+    # every option switch end up missing from the device.
     for coordinator in runtime.appliance_coordinators.values():
-        entry.async_create_background_task(
-            hass,
-            coordinator.async_refresh(),
-            f"{DOMAIN}-initial-refresh-{coordinator.data.info.ha_id}",
-        )
+        await coordinator.async_config_entry_first_refresh()
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     runtime.start_event_listener()
 
@@ -100,14 +106,6 @@ async def async_unload_entry(
     """Unload a Bosch Dishwasher config entry."""
     await entry.runtime_data.async_shutdown()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-
-async def async_migrate_entry(
-    hass: HomeAssistant, entry: BoschDishwasherConfigEntry
-) -> bool:
-    """Migrate old entries forward."""
-    _LOGGER.debug("Migrating from version %s.%s", entry.version, entry.minor_version)
-    return True
 
 
 async def _async_register_frontend_card(hass: HomeAssistant) -> None:
@@ -155,8 +153,10 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
 
     try:
         await async_get_integration(hass, "lovelace")
-    except Exception:  # noqa: BLE001
-        _LOGGER.debug("Lovelace integration not available; skipping resource registration")
+    except IntegrationNotFound:
+        _LOGGER.debug(
+            "Lovelace integration not available; skipping resource registration"
+        )
         return
 
     # In HA ≥ 2024.11 hass.data["lovelace"] is a LovelaceData dataclass
@@ -212,7 +212,7 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
         _LOGGER.info(
             "Bosch Dishwasher card registered as Lovelace resource at %s", desired_url
         )
-    except Exception as err:  # noqa: BLE001
+    except (HomeAssistantError, OSError, KeyError, ValueError) as err:
         _LOGGER.warning(
             "Could not auto-register Lovelace resource for the Bosch Dishwasher card "
             "(%s). Add it manually: URL=%s?v=%s, Type=JavaScript module. Error: %s",

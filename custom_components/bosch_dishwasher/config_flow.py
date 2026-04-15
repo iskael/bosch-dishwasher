@@ -46,12 +46,18 @@ class OAuth2FlowHandler(
 
     async def async_oauth_create_entry(self, data: dict) -> ConfigFlowResult:
         """Create or update entry after OAuth."""
-        await self.async_set_unique_id(
-            jwt.decode(
+        try:
+            payload = jwt.decode(
                 data["token"]["access_token"],
                 options={"verify_signature": False},
-            )["sub"]
-        )
+            )
+            unique_id = payload["sub"]
+        except (jwt.DecodeError, jwt.InvalidTokenError, KeyError, TypeError):
+            self.logger.warning(
+                "Home Connect returned a token we cannot decode; aborting"
+            )
+            return self.async_abort(reason="oauth_error")
+        await self.async_set_unique_id(unique_id)
         if self.source == SOURCE_REAUTH:
             self._abort_if_unique_id_mismatch(reason="wrong_account")
             return self.async_update_reload_and_abort(

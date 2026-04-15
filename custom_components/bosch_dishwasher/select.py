@@ -89,15 +89,18 @@ class HomeConnectProgramSelect(HomeConnectEntity, SelectEntity):
 
     def update_native_value(self) -> None:
         """Recompute current option from cached events."""
-        try:
-            event_key = EventKey(self.entity_description.key)
-        except ValueError:
+        event_key = EventKey(self.entity_description.key)
+        if event_key is EventKey.UNKNOWN:
             self._attr_current_option = None
             self._attr_options = []
             return
 
         event = self.appliance.events.get(event_key)
-        if event and isinstance(event.value, str):
+        if (
+            event
+            and isinstance(event.value, str)
+            and event.value != ProgramKey.UNKNOWN.value
+        ):
             self._attr_current_option = _program_to_slug(event.value)
         else:
             self._attr_current_option = None
@@ -105,7 +108,7 @@ class HomeConnectProgramSelect(HomeConnectEntity, SelectEntity):
         self._attr_options = sorted(
             _program_to_slug(program.key.value)
             for program in self.appliance.programs
-            if program.key
+            if program.key and program.key is not ProgramKey.UNKNOWN
         )
 
     async def async_select_option(self, option: str) -> None:

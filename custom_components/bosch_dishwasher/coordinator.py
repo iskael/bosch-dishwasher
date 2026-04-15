@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
-from collections.abc import Callable
+import contextlib
 from dataclasses import dataclass, field
 from datetime import timedelta
 import logging
@@ -206,6 +205,8 @@ class HomeConnectApplianceCoordinator(
             )
             for option in active_or_selected.options or []:
                 event_key = EventKey(option.key)
+                if event_key is EventKey.UNKNOWN:
+                    continue
                 self.data.events[event_key] = Event(
                     key=event_key,
                     raw_key=option.key,
@@ -254,11 +255,15 @@ class HomeConnectApplianceCoordinator(
 
         items = self._safe_items(message.data)
 
+        # Note: aiohomeconnect's StatusKey/EventKey/SettingKey/OptionKey
+        # enums return the <cls>.UNKNOWN member for unrecognised raw keys
+        # instead of raising ValueError, so we must filter UNKNOWN
+        # explicitly — otherwise stray events would overwrite each other
+        # on the single UNKNOWN dict slot.
         if message.type == EventType.STATUS:
             for event in items:
-                try:
-                    status_key = StatusKey(event.key)
-                except ValueError:
+                status_key = StatusKey(event.key)
+                if status_key is StatusKey.UNKNOWN:
                     continue
                 data.status[status_key] = Status(
                     key=status_key,
@@ -266,32 +271,26 @@ class HomeConnectApplianceCoordinator(
                     value=event.value,
                     name=event.name,
                 )
-                try:
-                    touched.add(EventKey(event.key))
-                except ValueError:
-                    pass
+                event_key = EventKey(event.key)
+                if event_key is not EventKey.UNKNOWN:
+                    touched.add(event_key)
         elif message.type == EventType.NOTIFY:
             program_changed = False
             for event in items:
-                try:
-                    setting_key = SettingKey(event.key)
-                except ValueError:
-                    setting_key = None
-                if setting_key is not None:
+                setting_key = SettingKey(event.key)
+                if setting_key is not SettingKey.UNKNOWN:
                     data.settings[setting_key] = GetSetting(
                         key=setting_key,
                         raw_key=setting_key.value,
                         value=event.value,
                         name=event.name,
                     )
-                    try:
-                        touched.add(EventKey(event.key))
-                    except ValueError:
-                        pass
-                    continue
-                try:
                     event_key = EventKey(event.key)
-                except ValueError:
+                    if event_key is not EventKey.UNKNOWN:
+                        touched.add(event_key)
+                    continue
+                event_key = EventKey(event.key)
+                if event_key is EventKey.UNKNOWN:
                     continue
                 data.events[event_key] = event
                 touched.add(event_key)
@@ -304,9 +303,8 @@ class HomeConnectApplianceCoordinator(
                 await self._refresh_options_after_program_change()
         elif message.type == EventType.EVENT:
             for event in items:
-                try:
-                    event_key = EventKey(event.key)
-                except ValueError:
+                event_key = EventKey(event.key)
+                if event_key is EventKey.UNKNOWN:
                     continue
                 data.events[event_key] = event
                 touched.add(event_key)
@@ -447,10 +445,12 @@ class HomeConnectRuntimeData:
         )
 
     async def async_shutdown(self) -> None:
-        """Cancel the SSE task on unload."""
+        """Cancel the SSE task on unload and wait for it to finish."""
         if self._event_task and not self._event_task.done():
             self._event_task.cancel()
-            self._event_task = None
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self._event_task
+        self._event_task = None
 
     async def _event_listener(self) -> None:
         """Long-lived task that consumes Home Connect SSE events."""
@@ -521,7 +521,11 @@ class HomeConnectRuntimeData:
             self.hass, self.entry, self.client, appliance
         )
         self.appliance_coordinators[message.ha_id] = coordinator
-        await coordinator.async_config_entry_first_refresh()
+        # Inside the SSE loop: use async_refresh, not first_refresh.
+        # first_refresh raises ConfigEntryNotReady on failure which is not
+        # appropriate for a running entry and would bubble up past the
+        # HomeConnectError handler in _event_listener.
+        await coordinator.async_refresh()
 
     def _handle_depaired_event(self, message: EventMessage) -> None:
         """Drop a removed dishwasher from the registry."""
