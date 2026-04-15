@@ -130,26 +130,27 @@ function programLabel(key) {
     .replace(/\b\w/g, c => c.toUpperCase());
 }
 
-// Entity capabilities — how to find each entity by device or prefix.
+// Entity capabilities — maps a capability key to the HA domain and translation_key
+// used by the bosch_dishwasher integration to register each entity.
 const CAPABILITIES = {
-  power:               { domain: 'switch',        translationKey: 'power',                  prefixSuffix: 'power' },
-  child_lock:          { domain: 'switch',        translationKey: 'child_lock',             prefixSuffix: 'child_lock' },
-  vario_speed:         { domain: 'switch',        translationKey: 'vario_speed_plus',       prefixSuffix: 'vario_speed_plus' },
-  silence_on_demand:   { domain: 'switch',        translationKey: 'silence_on_demand',      prefixSuffix: 'silence_on_demand' },
-  extra_dry:           { domain: 'switch',        translationKey: 'extra_dry',              prefixSuffix: 'extra_dry' },
-  half_load:           { domain: 'switch',        translationKey: 'half_load',              prefixSuffix: 'half_load' },
-  active_program:      { domain: 'select',        translationKey: 'active_program',         prefixSuffix: 'active_program' },
-  selected_program:    { domain: 'select',        translationKey: 'selected_program',       prefixSuffix: 'selected_program' },
-  door:                { domain: 'sensor',        translationKey: 'door_state',             prefixSuffix: 'door' },
-  operation_state:     { domain: 'sensor',        translationKey: 'operation_state',        prefixSuffix: 'operation_state' },
-  program_progress:    { domain: 'sensor',        translationKey: 'program_progress',       prefixSuffix: 'program_progress' },
-  program_finish_time: { domain: 'sensor',        translationKey: 'remaining_program_time', prefixSuffix: 'program_finish_time' },
-  salt_warning:        { domain: 'binary_sensor', translationKey: 'salt_nearly_empty',      prefixSuffix: 'salt_nearly_empty' },
-  rinse_warning:       { domain: 'binary_sensor', translationKey: 'rinse_aid_nearly_empty', prefixSuffix: 'rinse_aid_nearly_empty' },
-  remote_control:      { domain: 'binary_sensor', translationKey: 'remote_control',         prefixSuffix: 'remote_control' },
-  connected:           { domain: 'binary_sensor', translationKey: 'connected',              prefixSuffix: 'connected' },
-  start_in_relative:   { domain: 'sensor',        translationKey: 'start_in_relative',      prefixSuffix: 'start_in_relative' },
-  stop_program:        { domain: 'button',        translationKey: 'stop_program',           prefixSuffix: 'stop_program' },
+  power:               { domain: 'switch',        translationKey: 'power'                  },
+  child_lock:          { domain: 'switch',        translationKey: 'child_lock'             },
+  vario_speed:         { domain: 'switch',        translationKey: 'vario_speed_plus'       },
+  silence_on_demand:   { domain: 'switch',        translationKey: 'silence_on_demand'      },
+  extra_dry:           { domain: 'switch',        translationKey: 'extra_dry'              },
+  half_load:           { domain: 'switch',        translationKey: 'half_load'              },
+  active_program:      { domain: 'select',        translationKey: 'active_program'         },
+  selected_program:    { domain: 'select',        translationKey: 'selected_program'       },
+  door:                { domain: 'sensor',        translationKey: 'door_state'             },
+  operation_state:     { domain: 'sensor',        translationKey: 'operation_state'        },
+  program_progress:    { domain: 'sensor',        translationKey: 'program_progress'       },
+  program_finish_time: { domain: 'sensor',        translationKey: 'remaining_program_time' },
+  salt_warning:        { domain: 'binary_sensor', translationKey: 'salt_nearly_empty'      },
+  rinse_warning:       { domain: 'binary_sensor', translationKey: 'rinse_aid_nearly_empty' },
+  remote_control:      { domain: 'binary_sensor', translationKey: 'remote_control'         },
+  connected:           { domain: 'binary_sensor', translationKey: 'connected'              },
+  start_in_relative:   { domain: 'sensor',        translationKey: 'start_in_relative'      },
+  stop_program:        { domain: 'button',        translationKey: 'stop_program'           },
 };
 
 class BoschDishwasherCard extends LitElement {
@@ -159,21 +160,14 @@ class BoschDishwasherCard extends LitElement {
   };
 
   setConfig(config) {
-    if (!config.device && !config.entity_prefix) {
-      throw new Error('A `device` (Bosch dishwasher) is required.');
+    if (!config.device) {
+      throw new Error('A `device` (Bosch dishwasher) is required. Remove any `entity_prefix` and use the device picker in the card editor.');
     }
     this.config = {
       sensors:  DEFAULT_SENSORS,
       controls: DEFAULT_CONTROLS,
       ...config,
     };
-    if (config.entity_prefix && !config.device) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        '[bosch-dishwasher-card] `entity_prefix` is deprecated; '
-        + 'switch to the `device` selector. Support will be removed in v1.0.0.'
-      );
-    }
   }
 
   static getStubConfig() {
@@ -199,17 +193,11 @@ class BoschDishwasherCard extends LitElement {
   // ── Entity resolution ──────────────────────────────────────────────
   _entityId(capability) {
     const cap = CAPABILITIES[capability];
-    if (!cap) return undefined;
-    if (this.config.device && this.hass?.entities) {
-      for (const entity of Object.values(this.hass.entities)) {
-        if (entity.device_id !== this.config.device) continue;
-        if (!entity.entity_id?.startsWith(`${cap.domain}.`)) continue;
-        if (entity.translation_key === cap.translationKey) return entity.entity_id;
-      }
-      return undefined;
-    }
-    if (this.config.entity_prefix) {
-      return `${cap.domain}.${this.config.entity_prefix}_${cap.prefixSuffix}`;
+    if (!cap || !this.config.device || !this.hass?.entities) return undefined;
+    for (const entity of Object.values(this.hass.entities)) {
+      if (entity.device_id !== this.config.device) continue;
+      if (!entity.entity_id?.startsWith(`${cap.domain}.`)) continue;
+      if (entity.translation_key === cap.translationKey) return entity.entity_id;
     }
     return undefined;
   }
@@ -471,9 +459,8 @@ class BoschDishwasherCard extends LitElement {
     if (!this.hass || !this.config) return html``;
 
     const deviceName =
-      (this.config.device && this.hass.devices?.[this.config.device]?.name_by_user)
-      ?? (this.config.device && this.hass.devices?.[this.config.device]?.name)
-      ?? this.config.entity_prefix
+      this.hass.devices?.[this.config.device]?.name_by_user
+      ?? this.hass.devices?.[this.config.device]?.name
       ?? 'Bosch Dishwasher';
     const name = this.config.name ?? deviceName;
 
@@ -693,7 +680,7 @@ class BoschDishwasherCardEditor extends LitElement {
           .hass=${this.hass}
           .value=${this._config.device ?? ''}
           .configValue=${'device'}
-          .includeDomains=${['bosch_dishwasher']}
+          .integrations=${['bosch_dishwasher']}
           label="Bosch dishwasher"
           @value-changed=${this._valueChanged}
         ></ha-device-picker>
