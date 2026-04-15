@@ -9,8 +9,8 @@ import aiohttp
 from aiohomeconnect.client import Client as HomeConnectClient
 
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
+from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.config_entry_oauth2_flow import (
@@ -32,6 +32,9 @@ _LOGGER = logging.getLogger(__name__)
 _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
 _LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 _ICON_URL = f"/api/{DOMAIN}/icon.png"
+
+# Matches manifest.json version — bump together.
+_CARD_VERSION = "2.2.5"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -141,39 +144,53 @@ async def _async_register_frontend_card(hass: HomeAssistant) -> None:
         except (RuntimeError, ValueError):
             pass
 
-    await _async_register_lovelace_resource(hass)
+    # Schedule Lovelace resource registration — defer until HA is fully started
+    # so that hass.data["lovelace"]["resources"] is guaranteed to be available.
+    if hass.is_running:
+        await _async_register_lovelace_resource(hass)
+    else:
+        async def _on_started(event: Event) -> None:
+            await _async_register_lovelace_resource(hass)
+
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_started)
 
 
 async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
     """Auto-add the card as a Lovelace resource so users don't have to."""
+    # Guard: skip if already registered in this HA session.
     if hass.data.get(_LOVELACE_RESOURCE_KEY):
         return
-    hass.data[_LOVELACE_RESOURCE_KEY] = True
 
     try:
-        integration = await async_get_integration(hass, "lovelace")
+        await async_get_integration(hass, "lovelace")
     except Exception:  # noqa: BLE001
         _LOGGER.debug("Lovelace integration not available; skipping resource registration")
         return
 
     try:
-        # HA ≥ 2024.x stores resources in lovelace.resources (a StorageCollection)
         resources = hass.data.get("lovelace", {}).get("resources")
         if resources is None:
-            _LOGGER.debug("Lovelace resource store not found; add %s manually", CARD_URL)
+            _LOGGER.debug(
+                "Lovelace resource store not found; add %s manually as a JavaScript module",
+                CARD_URL,
+            )
             return
 
         await resources.async_load()
         existing = [r for r in resources.async_items() if CARD_URL in r.get("url", "")]
         if existing:
             _LOGGER.debug("Lovelace resource %s already registered", CARD_URL)
+            # Mark done so we don't check again this session.
+            hass.data[_LOVELACE_RESOURCE_KEY] = True
             return
 
-        integration_version = "2.0.0"
         await resources.async_create_item(
-            {"res_type": "module", "url": f"{CARD_URL}?v={integration_version}"}
+            {"res_type": "module", "url": f"{CARD_URL}?v={_CARD_VERSION}"}
         )
-        _LOGGER.info("Bosch Dishwasher card registered as Lovelace resource at %s", CARD_URL)
+        hass.data[_LOVELACE_RESOURCE_KEY] = True
+        _LOGGER.info(
+            "Bosch Dishwasher card registered as Lovelace resource at %s", CARD_URL
+        )
     except Exception as err:  # noqa: BLE001
         _LOGGER.warning(
             "Could not auto-register Lovelace resource for the Bosch Dishwasher card "
