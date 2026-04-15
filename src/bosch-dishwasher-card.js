@@ -195,6 +195,19 @@ class BoschDishwasherCard extends LitElement {
 
   getCardSize() { return 4; }
 
+  // Sections-layout grid sizing — tells HA the card is resize-aware and
+  // provides sensible defaults + bounds so users can stretch it without
+  // the "no totalmente compatible" warning.
+  getGridOptions() {
+    return {
+      columns: 12,        // default: full section width (12/12)
+      rows: 'auto',       // height follows content
+      min_columns: 6,     // below this the sensor/control grid collapses
+      min_rows: 3,        // header + one data row minimum
+      max_columns: 12,
+    };
+  }
+
   _t(key) {
     const lang = (this.hass?.locale?.language ?? 'en').split('-')[0];
     return (I18N[lang] ?? I18N.en)[key] ?? I18N.en[key] ?? key;

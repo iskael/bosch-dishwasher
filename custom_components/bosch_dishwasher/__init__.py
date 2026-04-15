@@ -33,7 +33,7 @@ _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
 _LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "0.1.6"
+_CARD_VERSION = "0.1.7"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
