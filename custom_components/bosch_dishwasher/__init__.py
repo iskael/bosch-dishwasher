@@ -33,7 +33,7 @@ _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
 _LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "0.1.5"
+_CARD_VERSION = "0.1.6"
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -185,18 +185,29 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
 
     try:
         await resources.async_load()
+        desired_url = f"{CARD_URL}?v={_CARD_VERSION}"
         existing = [r for r in resources.async_items() if CARD_URL in r.get("url", "")]
         if existing:
-            _LOGGER.debug("Lovelace resource %s already registered", CARD_URL)
+            item = existing[0]
+            if item.get("url") == desired_url:
+                _LOGGER.debug("Lovelace resource %s already at version", desired_url)
+            else:
+                # Bump the version query string so the browser reloads the bundle.
+                await resources.async_update_item(
+                    item["id"], {"res_type": "module", "url": desired_url}
+                )
+                _LOGGER.info(
+                    "Bosch Dishwasher card resource URL bumped to %s", desired_url
+                )
             hass.data[_LOVELACE_RESOURCE_KEY] = True
             return
 
         await resources.async_create_item(
-            {"res_type": "module", "url": f"{CARD_URL}?v={_CARD_VERSION}"}
+            {"res_type": "module", "url": desired_url}
         )
         hass.data[_LOVELACE_RESOURCE_KEY] = True
         _LOGGER.info(
-            "Bosch Dishwasher card registered as Lovelace resource at %s", CARD_URL
+            "Bosch Dishwasher card registered as Lovelace resource at %s", desired_url
         )
     except Exception as err:  # noqa: BLE001
         _LOGGER.warning(
