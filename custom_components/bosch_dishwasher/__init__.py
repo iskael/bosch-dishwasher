@@ -12,12 +12,13 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.config_entry_oauth2_flow import (
     ImplementationUnavailableError,
     OAuth2Session,
     async_get_config_entry_implementation,
 )
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
 from .api import AsyncConfigEntryAuth
@@ -33,10 +34,12 @@ _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
 _LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "0.1.7"
+_CARD_VERSION = "0.1.8"
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Bosch Dishwasher component (YAML not supported)."""
     return True
 

@@ -3,7 +3,7 @@
   "name": "Bosch Dishwasher",
   "codeowners": ["@iskael"],
   "config_flow": true,
-  "dependencies": ["application_credentials"],
+  "dependencies": ["application_credentials", "http"],
   "dhcp": [
     {"hostname": "balay-*", "macaddress": "68A40E*"},
     {"hostname": "bosch-*", "macaddress": "68A40E*"},
