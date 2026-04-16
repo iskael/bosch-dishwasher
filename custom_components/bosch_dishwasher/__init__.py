@@ -37,7 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "0.1.10"
+_CARD_VERSION = "1.0.0"
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
