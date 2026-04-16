@@ -50,18 +50,6 @@ device: 2c4a1f8b9e7d4f6a8c3b1d5e7f9a2b4c   # device_id from the picker
 name: Lavavajillas                          # optional override
 ```
 
-### Legacy `entity_prefix` config (deprecated)
-
-For one release the card still accepts the v0.1.x prefix-based config:
-
-```yaml
-type: custom:bosch-dishwasher-card
-entity_prefix: lavavajillas
-name: Lavavajillas
-```
-
-This path logs a deprecation warning in the browser console and will be removed in v1.0.0. Migrate to the device picker.
-
 ## Entities exposed by the integration
 
 All entity labels are translated via `translation_key` so language follows your HA locale.
@@ -104,7 +92,7 @@ The card consumes a curated subset of these. Power users can build automations a
 ## Troubleshooting
 
 - **"Custom element not found: bosch-dishwasher-card"** — hard-refresh the dashboard. The card is auto-registered at `/api/bosch_dishwasher/card.js`; if your HA cached the previous resource URL bump it with `?v=N`.
-- **Card is empty / says "Selecciona un dispositivo"** — open the card editor and pick a device. The legacy `entity_prefix` mode only works if you migrated from v0.1.x.
+- **Card is empty / says "Selecciona un dispositivo"** — open the card editor and pick a device from the integration-filtered list.
 - **OAuth fails with `invalid_redirect_uri`** — your Home Connect Developer Portal application must have **`https://my.home-assistant.io/redirect/oauth`** set as the redirect URI exactly.
 - **Silencio button stays disabled** — Home Connect reports `silence_on_demand` as `unavailable` while the dishwasher is off or idle; it only becomes controllable mid-cycle.
 - **Some option switches don't appear** — Home Connect only exposes the options supported by the currently selected program. Pick a program first.
