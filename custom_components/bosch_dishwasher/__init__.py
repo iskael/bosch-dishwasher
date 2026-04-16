@@ -35,10 +35,9 @@ from .coordinator import (
 _LOGGER = logging.getLogger(__name__)
 
 _CARD_REGISTERED_KEY = f"{DOMAIN}_card_registered"
-_LOVELACE_RESOURCE_KEY = f"{DOMAIN}_resource_added"
 
 # Matches manifest.json version — bump together.
-_CARD_VERSION = "0.1.9"
+_CARD_VERSION = "0.1.10"
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -146,11 +145,16 @@ async def _async_register_frontend_card(hass: HomeAssistant) -> None:
 
 
 async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
-    """Auto-add the card as a Lovelace resource so users don't have to."""
-    # Guard: skip if already registered in this HA session.
-    if hass.data.get(_LOVELACE_RESOURCE_KEY):
-        return
+    """Auto-add the card as a Lovelace resource so users don't have to.
 
+    Runs on every entry setup (no run-once guard). The version-query
+    comparison below makes it idempotent, and rerunning on reload is
+    what lets the ?v= marker get bumped after a HACS update — the
+    previous hass.data-keyed guard blocked that code path because
+    hass.data survives entry reloads (it's not cleared by
+    async_unload_entry), so the function returned early and nothing
+    ever updated the stored URL after the first run.
+    """
     try:
         await async_get_integration(hass, "lovelace")
     except IntegrationNotFound:
@@ -183,32 +187,29 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
             CARD_URL,
             _CARD_VERSION,
         )
-        hass.data[_LOVELACE_RESOURCE_KEY] = True
         return
 
     try:
         await resources.async_load()
         desired_url = f"{CARD_URL}?v={_CARD_VERSION}"
         existing = [r for r in resources.async_items() if CARD_URL in r.get("url", "")]
-        if existing:
-            item = existing[0]
-            if item.get("url") == desired_url:
-                _LOGGER.debug("Lovelace resource %s already at version", desired_url)
-            else:
-                # Bump the version query string so the browser reloads the bundle.
-                await resources.async_update_item(
-                    item["id"], {"res_type": "module", "url": desired_url}
-                )
-                _LOGGER.info(
-                    "Bosch Dishwasher card resource URL bumped to %s", desired_url
-                )
-            hass.data[_LOVELACE_RESOURCE_KEY] = True
+
+        if existing and existing[0].get("url") == desired_url:
+            _LOGGER.debug("Lovelace resource %s already at version", desired_url)
             return
+
+        # If an older-versioned entry exists, drop it and recreate. Using
+        # delete+create instead of async_update_item sidesteps questions
+        # about which key name (type vs res_type) the update schema wants.
+        for stale in existing:
+            try:
+                await resources.async_delete_item(stale["id"])
+            except (HomeAssistantError, KeyError) as err:
+                _LOGGER.debug("Could not delete stale resource %s: %s", stale, err)
 
         await resources.async_create_item(
             {"res_type": "module", "url": desired_url}
         )
-        hass.data[_LOVELACE_RESOURCE_KEY] = True
         _LOGGER.info(
             "Bosch Dishwasher card registered as Lovelace resource at %s", desired_url
         )
