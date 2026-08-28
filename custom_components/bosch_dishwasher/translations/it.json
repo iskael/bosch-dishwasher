@@ -1,0 +1,166 @@
+{
+  "application_credentials": {
+    "description": "Crea la tua applicazione sviluppatore Home Connect sul [Portale degli sviluppatori Home Connect]({applications_url}) e incolla qui il **Client ID** e il **Client Secret**. L'URI di reindirizzamento dell'applicazione deve essere impostato su `{redirect_url}`."
+  },
+  "config": {
+    "abort": {
+      "already_configured": "Questo account Home Connect è già configurato.",
+      "wrong_account": "Autenticati nuovamente utilizzando lo stesso account Home Connect."
+    },
+    "create_entry": {
+      "default": "Autenticazione con Home Connect riuscita."
+    },
+    "step": {
+      "reauth_confirm": {
+        "description": "L'integrazione della lavastoviglie Bosch deve autenticare nuovamente il tuo account Home Connect.",
+        "title": "Riaddomanda autenticazione lavastoviglie Bosch"
+      }
+    }
+  },
+  "exceptions": {
+    "set_option": {"message": "Impossibile impostare l'opzione: {error}"},
+    "set_setting": {"message": "Impossibile modificare l'impostazione: {error}"},
+    "set_power": {"message": "Impossibile modificare lo stato di alimentazione: {error}"},
+    "select_program": {"message": "Impossibile selezionare il programma: {error}"},
+    "press_command": {"message": "Impossibile inviare il comando: {error}"},
+    "stop_program": {"message": "Impossibile interrompere il programma: {error}"},
+    "unknown_program": {"message": "Programma lavastoviglie sconosciuto: {program}"}
+  },
+  "entity": {
+    "binary_sensor": {
+      "remote_control": {"name": "Controllo remoto"},
+      "remote_control_start_allowed": {"name": "Avvio remoto"},
+      "local_control": {"name": "Controllo locale"},
+      "salt_nearly_empty": {"name": "Sale quasi esaurito"},
+      "rinse_aid_nearly_empty": {"name": "Brillantante quasi esaurito"},
+      "connected": {"name": "Connesso"}
+    },
+    "button": {
+      "open_door": {"name": "Apri porta"},
+      "partly_open_door": {"name": "Apri parzialmente porta"},
+      "pause_program": {"name": "Metti in pausa il programma"},
+      "resume_program": {"name": "Riprendi programma"},
+      "stop_program": {"name": "Interrompi programma"}
+    },
+    "select": {
+      "active_program": {
+        "name": "Programma attivo",
+        "state": {
+          "dishcare_dishwasher_program_auto_1": "Auto 1",
+          "dishcare_dishwasher_program_auto_2": "Auto 2",
+          "dishcare_dishwasher_program_auto_3": "Auto 3",
+          "dishcare_dishwasher_program_auto_half_load": "Auto mezzo carico",
+          "dishcare_dishwasher_program_eco_50": "Eco 50ºC",
+          "dishcare_dishwasher_program_express_sparkle_65": "Express Sparkle 65ºC",
+          "dishcare_dishwasher_program_glas_40": "Bicchieri 40ºC",
+          "dishcare_dishwasher_program_glass_care": "Protezione cristalli",
+          "dishcare_dishwasher_program_intensiv_45": "Intensivo 45ºC",
+          "dishcare_dishwasher_program_intensiv_70": "Intensivo 70ºC",
+          "dishcare_dishwasher_program_intensiv_power": "Intensivo Power",
+          "dishcare_dishwasher_program_intensive_fixed_zone": "Zona fissa intensiva",
+          "dishcare_dishwasher_program_kurz_60": "Rapido 60ºC",
+          "dishcare_dishwasher_program_learning_dishwasher": "Intelligente",
+          "dishcare_dishwasher_program_machine_care": "Cura della macchina",
+          "dishcare_dishwasher_program_magic_daily": "Magic Daily",
+          "dishcare_dishwasher_program_maximum_cleaning": "Massima pulizia",
+          "dishcare_dishwasher_program_mixed_load": "Carico misto",
+          "dishcare_dishwasher_program_night_wash": "Lavaggio notturno",
+          "dishcare_dishwasher_program_normal_45": "Normale 45ºC",
+          "dishcare_dishwasher_program_normal_65": "Normale 65ºC",
+          "dishcare_dishwasher_program_pre_rinse": "Prelavaggio",
+          "dishcare_dishwasher_program_quick_45": "Rapido 45ºC",
+          "dishcare_dishwasher_program_quick_65": "Rapido 65ºC",
+          "dishcare_dishwasher_program_steam_fresh": "Vapore Fresh",
+          "dishcare_dishwasher_program_super_60": "Super 60ºC"
+        }
+      },
+      "selected_program": {
+        "name": "Programma selezionato",
+        "state": {
+          "dishcare_dishwasher_program_auto_1": "Auto 1",
+          "dishcare_dishwasher_program_auto_2": "Auto 2",
+          "dishcare_dishwasher_program_auto_3": "Auto 3",
+          "dishcare_dishwasher_program_auto_half_load": "Auto mezzo carico",
+          "dishcare_dishwasher_program_eco_50": "Eco 50ºC",
+          "dishcare_dishwasher_program_express_sparkle_65": "Express Sparkle 65ºC",
+          "dishcare_dishwasher_program_glas_40": "Bicchieri 40ºC",
+          "dishcare_dishwasher_program_glass_care": "Protezione cristalli",
+          "dishcare_dishwasher_program_intensiv_45": "Intensivo 45ºC",
+          "dishcare_dishwasher_program_intensiv_70": "Intensivo 70ºC",
+          "dishcare_dishwasher_program_intensiv_power": "Intensivo Power",
+          "dishcare_dishwasher_program_intensive_fixed_zone": "Zona fissa intensiva",
+          "dishcare_dishwasher_program_kurz_60": "Rapido 60ºC",
+          "dishcare_dishwasher_program_learning_dishwasher": "Intelligente",
+          "dishcare_dishwasher_program_machine_care": "Cura della macchina",
+          "dishcare_dishwasher_program_magic_daily": "Magic Daily",
+          "dishcare_dishwasher_program_maximum_cleaning": "Massima pulizia",
+          "dishcare_dishwasher_program_mixed_load": "Carico misto",
+          "dishcare_dishwasher_program_night_wash": "Lavaggio notturno",
+          "dishcare_dishwasher_program_normal_45": "Normale 45ºC",
+          "dishcare_dishwasher_program_normal_65": "Normale 65ºC",
+          "dishcare_dishwasher_program_pre_rinse": "Prelavaggio",
+          "dishcare_dishwasher_program_quick_45": "Rapido 45ºC",
+          "dishcare_dishwasher_program_quick_65": "Rapido 65ºC",
+          "dishcare_dishwasher_program_steam_fresh": "Vapore Fresh",
+          "dishcare_dishwasher_program_super_60": "Super 60ºC"
+        }
+      }
+    },
+    "sensor": {
+      "operation_state": {
+        "name": "Stato operativo",
+        "state": {
+          "inactive": "Inattivo",
+          "ready": "Pronto",
+          "delayed_start": "Avvio ritardato",
+          "run": "In corso",
+          "pause": "In pausa",
+          "action_required": "Azione richiesta",
+          "finished": "Terminato",
+          "error": "Errore",
+          "aborting": "Annullamento in corso"
+        }
+      },
+      "door_state": {
+        "name": "Porta",
+        "state": {
+          "open": "Aperta",
+          "closed": "Chiusa",
+          "locked": "Bloccata"
+        }
+      },
+      "program_progress": {"name": "Avanzamento programma"},
+      "remaining_program_time": {"name": "Tempo rimanente"},
+      "program_finished": {
+        "name": "Programma terminato",
+        "state": {
+          "off": "Disattivato",
+          "present": "Presente",
+          "confirmed": "Confermato"
+        }
+      },
+      "program_aborted": {
+        "name": "Programma annullato",
+        "state": {
+          "off": "Disattivato",
+          "present": "Presente",
+          "confirmed": "Confermato"
+        }
+      },
+      "start_in_relative": {"name": "Avvio programmato"}
+    },
+    "switch": {
+      "power": {"name": "Alimentazione"},
+      "child_lock": {"name": "Sicurezza bambini"},
+      "intensiv_zone": {"name": "Zona intensiva"},
+      "brilliance_dry": {"name": "Asciugatura Brillante"},
+      "vario_speed_plus": {"name": "VarioSpeed+"},
+      "silence_on_demand": {"name": "Silenzioso su richiesta"},
+      "half_load": {"name": "Mezzo carico"},
+      "extra_dry": {"name": "Asciugatura extra"},
+      "hygiene_plus": {"name": "Hygiene+"},
+      "eco_dry": {"name": "Asciugatura Eco"},
+      "zeolite_dry": {"name": "Asciugatura Zeolite"}
+    }
+  }
+}
